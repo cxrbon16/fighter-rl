@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+dogfight_tensorboard/
+*.zip
+*.pdf
