@@ -5,14 +5,33 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor
 from dogfight_env import DogfightParallelEnv  # Ortamınızı içeren dosya
 import torch
+from typing import Callable
+import numpy as np
+
 
 custom_policy_kwargs = dict(
     activation_fn=torch.nn.Tanh,  # Aktivasyon fonksiyonu (Tanh veya ReLU kullanılabilir)
     net_arch=dict(
-        pi=[64, 64],    # Aktör (Policy) Ağı: Hangi hamleyi yapacağına karar veren ağ
-        vf=[64, 64]     # Kritik (Value) Ağı: Bulunduğu durumun ne kadar iyi olduğunu tahmin eden ağ
+        pi=[128, 128],    # Aktör (Policy) Ağı: Hangi hamleyi yapacağına karar veren ağ
+        vf=[128, 128]     # Kritik (Value) Ağı: Bulunduğu durumun ne kadar iyi olduğunu tahmin eden ağ
     )
 )
+
+
+def cosine_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Öğrenme hızını (LR) eğitimin başından sonuna kadar kosinüs eğrisiyle düşürür.
+    progress_remaining: Eğitimin başında 1.0, sonunda 0.0 olur.
+    """
+    def func(progress_remaining: float) -> float:
+        # progress_remaining 1'den 0'a inerken, (1 - progress_remaining) 0'dan 1'e çıkar.
+        # cosinus içerisi 0'dan pi'ye doğru gider.
+        # cos(0)=1, cos(pi)=-1 olur. Başına eksi koyup 1 ekleyince [0, 2] arası salınır, 2'ye bölünce [0, 1] olur.
+        cos_out = 0.5 * (1.0 + np.cos(np.pi * (1.0 - progress_remaining)))
+        return cos_out * initial_value
+        
+    return func
+
 
 def train():
     # 1. Ortamı yarat (Eğitim sırasında render kapalı olmalı)
@@ -22,17 +41,23 @@ def train():
     # Bu wrapper, ParallelEnv içindeki ajanları düzleştirerek tek bir politikanın
     # (parameter sharing) her iki ajanı da kontrol etmesini sağlar.
     env = ss.black_death_v3(env) 
+
+    env = ss.frame_stack_v1(env, stack_size=4)
     
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     
     # JSBSim'in RAM ve CPU kullanımı yoğun olduğu için num_vec_envs=1 tutuyoruz.
     # Eğer sisteminiz güçlüyse num_vec_envs değerini artırıp eğitimi hızlandırabilirsiniz.
-    env = ss.concat_vec_envs_v1(env, num_vec_envs=128, num_cpus=1, base_class='stable_baselines3')
+    env = ss.concat_vec_envs_v1(env, num_vec_envs=256, num_cpus=8, base_class='stable_baselines3')
     env = VecMonitor(env)
 
-    # Modelin düzenli kaydedilmesi için callback (Her 10.000 adımda bir)
+    # 🔥 İŞTE ÇÖZÜM: Global frekansı, toplam paralel ajan sayısına bölüyoruz
+    global_save_freq = 250_000
+    real_save_freq = max(1, global_save_freq // env.num_envs)
+
+    # Modelin düzenli kaydedilmesi için callback
     checkpoint_callback = CheckpointCallback(
-        save_freq=250_000, 
+        save_freq=real_save_freq, 
         save_path='./models/dogfight_ppo/',
         name_prefix='ppo_dogfight'
     )
@@ -42,11 +67,11 @@ def train():
         "MlpPolicy",
         env,
         policy_kwargs=custom_policy_kwargs,
-        verbose=1,
-        learning_rate=3e-5,
-        n_steps=2048,           # JSBSim sürekli bir simülasyon olduğu için yüksek n_steps iyidir
-        n_epochs=4,
-        ent_coef=0.01,
+        verbose=0,
+        learning_rate=cosine_schedule(1e-5),
+        n_steps=512,           # JSBSim sürekli bir simülasyon olduğu için yüksek n_steps iyidir
+        n_epochs=3,
+        ent_coef=0.02,
         batch_size=8192,
         gamma=0.99,             # Gelecekteki ödüllerin önem katsayısı
         tensorboard_log="./dogfight_tensorboard/"
@@ -57,7 +82,7 @@ def train():
     
     # 4. Modeli Eğit
     # İt dalaşı zor bir problemdir, anlamlı sonuçlar için bu sayıyı 1_000_000'a çıkarmanız gerekebilir.
-    model.learn(total_timesteps=10_000_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=15_000_000, callback=checkpoint_callback)
 
     # 5. Eğitilmiş Modeli Kaydet
     model.save("ppo_dogfight_final")
@@ -67,32 +92,51 @@ def train():
 def test():
     print("Eğitilmiş model test ediliyor...")
     
-    # Test için render modunu açıyoruz
+    # Test için render modunu açıyoruz (Panda3D)
     env = DogfightParallelEnv(render_mode="human")
     
-    # Kaydedilmiş modeli yüklüyoruz
+    # --- EĞİTİMDEKİ WRAPPER ZİNCİRİNİ EKSİKSİZ KURUYORUZ ---
+    env = ss.black_death_v3(env) 
+    env = ss.frame_stack_v1(env, stack_size=4)
+    env = ss.pettingzoo_env_to_vec_env_v1(env)
+    
+    # 🔥 İŞTE HATAYI BİTİREN ALTIN SATIR: LazyFrames'i SB3 formatına çevirir
+    # Test olduğu için num_vec_envs=1 ve num_cpus=1 yapıyoruz.
+    env = ss.concat_vec_envs_v1(
+        env, 
+        num_vec_envs=1, 
+        num_cpus=1, 
+        base_class='stable_baselines3'
+    )
+    
+    # Modeli yüklüyoruz
     model = PPO.load("ppo_dogfight_final")
     
-    observations, infos = env.reset()
+    # 🔄 SB3 VecEnv kullanınca reset() sadece 'obs' döndürür (Tuple karmaşası bitti!)
+    obs = env.reset()
+
+    print("Simülasyon başladı! İzlemek için Panda3D penceresine bakın...")
     
-    # Ortamda ajan kaldığı sürece döngüye devam et
-    while env.agents:
-        actions = {}
+    for step in range(10000):
+        # Artık obs %100 homojen bir NumPy matrisi, predict anında çalışacak
+        action, _states = model.predict(obs, deterministic=True)
         
-        # Her bir ajan için modelden ayrı ayrı aksiyon tahmini al
-        for agent in env.agents:
-            # Deterministic=True modeli rastgelelikten çıkarıp öğrendiği en iyi hamleyi yapmaya zorlar
-            action, _states = model.predict(observations[agent], deterministic=True)
-            actions[agent] = action
-            
-        # Ajanların aksiyonlarını ortama gönder ve yeni durumları al
-        observations, rewards, terminations, truncations, infos = env.step(actions)
+        # 🔄 SB3 VecEnv kullanınca step() tam 4 değer döndürür 
+        # (terminated ve truncated arka planda birleşip 'dones' olur)
+        obs, rewards, dones, infos = env.step(action)
         
-        # Eğer ajanlardan biri elendiyse (terminations/truncations True olduysa)
-        # PettingZoo kuralı gereği ajanları güncelliyoruz (bu sizin env.step içindeki self.agents = [] mantığınızla çalışır)
-        if not env.agents:
-            print("Simülasyon bitti!")
-            break
+        # --- TELEMETRİ PRINT BÖLÜMÜ ---
+        if step % 5 == 0:
+            print(f"✈️ Adım: {step:04d} "
+                  f"| A1 Ödül: {rewards[0]:.2f} "
+                  f"| A2 Ödül: {rewards[1]:.2f} "
+                  f"| A1 Aksiyon (Ail/Elev/Thro): [{action[0][0]:.2f}, {action[0][1]:.2f}, {action[0][2]:.2f}]")
+        
+        # dones dizisi, 1. veya 2. ajanın (index 0 veya 1) o adımda ölüp ölmediğini söyler
+        if dones[0]:
+            print("💥 Agent 1 elendi veya süre bitti! Yeniden doğuyor...")
+        if dones[1]:
+            print("💥 Agent 2 elendi veya süre bitti! Yeniden doğuyor...")
 
 if __name__ == "__main__":
     # Önce eğitimi çalıştır

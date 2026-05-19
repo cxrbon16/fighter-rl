@@ -8,55 +8,63 @@ def test():
     print("Eğitilmiş model test ediliyor...")
     
     # Test için render modunu açıyoruz
-    env = DogfightParallelEnv(render_mode="human")
+    env = DogfightParallelEnv(render_mode="panda")
     
-    # Kaydedilmiş modeli yüklüyoruz
+    # 2. 🔥 EĞİTİMDEKİ WRAPPER ZİNCİRİNİ BURADA DA AYNEN KURUYORUZ
+    env = ss.black_death_v3(env) 
+    
+    # Boyut hatasını bitiren asıl sihir: Gözlemi 8'den 32'ye çıkaran hafıza katmanı
+    env = ss.frame_stack_v1(env, stack_size=4)
+    
+    # Çoklu ajan yapısını SB3'ün anlayacağı tek bir vektör haline getiriyoruz (Boyut: 64 veya 128 olur)
+    env = ss.pettingzoo_env_to_vec_env_v1(env)
+    
+    # Test esnasında izleme wrapper'ı (isteğe bağlı ama uyum için iyi olur)
+
+    # ... (Yukarıdaki env tanımlamaları ve model.load kısımları AYNEN KALDI) ...
+    
+    # Modeli yükledik
     model = PPO.load("ppo_dogfight_final")
     
-    observations, infos = env.reset()
-    
-    step_count = 0
-    
-    # Ortamda ajan kaldığı sürece döngüye devam et
-    while env.agents:
-        actions = {}
         
-        # Her bir ajan için modelden ayrı ayrı aksiyon tahmini al
-        for agent in env.agents:
-            obs = observations[agent]
-            action, _states = model.predict(obs, deterministic=True)
-            actions[agent] = action
-            
-            # EKRANI TEMİZ TUTMAK İÇİN SADECE AGENT_1'İ LOGLAYALIM
-            if agent == "agent_1":
-                # Gözlemleri (Observations) Ayrıştır
-                alt = obs[0]
-                vc = obs[1]
-                roll_deg = np.degrees(obs[2])   # Radyanı dereceye çevir
-                pitch_deg = np.degrees(obs[3])  # Radyanı dereceye çevir
-                
-                # Modelin Kararlarını (Actions) Ayrıştır
-                aileron = action[0]   # -1.0 (Tam Sol) ile 1.0 (Tam Sağ)
-                elevator = action[1]  # -1.0 (Aşağı bas) ile 1.0 (Kendine çek)
-                
-                # PPO -1 ile 1 arası değer üretir, ortam bunu 0-1 arası throttle'a çevirir
-                throttle_gercek = (action[2] + 1.0) / 2.0 
-                
-                # Terminalde yan yana ve üst üste yazması için (Spam yapmaması için \r kullanıyoruz)
-                log_text = (
-                    f"✈️ ALT: {alt:5.0f}ft | HIZ: {vc:3.0f}kts | "
-                    f"PITCH: {pitch_deg:5.1f}° | ROLL: {roll_deg:5.1f}°  ||  "
-                    f"🕹️ LÖVYE -> Ail: {aileron:5.2f} | Elev: {elevator:5.2f} | Thr: %{throttle_gercek*100:3.0f}   "
-                )
-                print(log_text, end='\r')
-            
-        # Ajanların aksiyonlarını ortama gönder ve yeni durumları al
-        observations, rewards, terminations, truncations, infos = env.step(actions)
-        step_count += 1
+    # 1. Ortamı sıfırla
+    raw_obs = env.reset()
+    
+    # 🔄 EMNİYET KEMERİ 1: SuperSuit'in döndürdüğü o tuple/dict karmaşasından 
+    # saf NumPy matrisini ayıklıyoruz. Genelde ilk eleman ana matristir.
+    if isinstance(raw_obs, tuple):
+        obs = raw_obs[0]
+    else:
+        obs = raw_obs
+
+    print("Simülasyon başladı! İzlemek için FlightGear'a bakın...")
+    
+    for step in range(10000):
+        # Modelden aksiyonları al
+        action, _states = model.predict(obs, deterministic=True)
         
-        if not env.agents:
-            print("\nSimülasyon bitti! Toplam Adım:", step_count)
-            break
+        # 🔄 REÇETE: 4 yerine tam 5 değer açıyoruz! (terminated ve truncated geldi)
+        raw_obs, rewards, terminations, truncations, infos = env.step(action)
+        
+        # Emniyet kemerimiz: Gelen ham gözlem tuple ise ilk elemanı (saf matrisi) al
+        if isinstance(raw_obs, tuple):
+            obs = raw_obs[0]
+        else:
+            obs = raw_obs
+        
+        # --- TELEMETRİ PRINT BÖLÜMÜ ---
+        if step % 5 == 0:
+            print(f"✈️ Adım: {step:04d} "
+                  f"| A1 Ödül: {rewards[0]:.2f} "
+                  f"| A2 Ödül: {rewards[1]:.2f} "
+                  f"| A1 Aksiyon (Ail/Elev/Thro): [{action[0][0]:.2f}, {action[0][1]:.2f}, {action[0][2]:.2f}]")
+        
+        # 🔄 YENİ KONTROL: modern sistemde bir uçağın sıfırlanması için 
+        # ya elenmesi (termination) ya da süresinin bitmesi (truncation) gerekir.
+        if terminations[0] or truncations[0]:
+            print("💥 Agent 1 elendi veya süre bitti! Yeniden doğuyor...")
+        if terminations[1] or truncations[1]:
+            print("💥 Agent 2 elendi veya süre bitti! Yeniden doğuyor...")
 
 if __name__ == "__main__":
     test()
