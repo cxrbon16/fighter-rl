@@ -3,3 +3,4 @@ __pycache__/
 dogfight_tensorboard/
 *.zip
 *.pdf
+wandb/

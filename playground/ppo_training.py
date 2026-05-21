@@ -2,12 +2,13 @@ import os
 import supersuit as ss
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
-from stable_baselines3.common.vec_env import VecMonitor
+from stable_baselines3.common.vec_env import VecMonitor, VecNormalize
 from dogfight_env import DogfightParallelEnv  # Ortamınızı içeren dosya
 import torch
 from typing import Callable
 import numpy as np
-
+import wandb
+from wandb.integration.sb3 import WandbCallback
 
 custom_policy_kwargs = dict(
     activation_fn=torch.nn.Tanh,  # Aktivasyon fonksiyonu (Tanh veya ReLU kullanılabilir)
@@ -48,8 +49,16 @@ def train():
     
     # JSBSim'in RAM ve CPU kullanımı yoğun olduğu için num_vec_envs=1 tutuyoruz.
     # Eğer sisteminiz güçlüyse num_vec_envs değerini artırıp eğitimi hızlandırabilirsiniz.
-    env = ss.concat_vec_envs_v1(env, num_vec_envs=256, num_cpus=8, base_class='stable_baselines3')
+    env = ss.concat_vec_envs_v1(env, num_vec_envs=64, num_cpus=8, base_class='stable_baselines3')
     env = VecMonitor(env)
+    env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_reward=10.0)
+
+
+    run = wandb.init(
+        project="f15-dogfight", # W&B sitesinde görünecek proje adı
+        sync_tensorboard=True,  # İşte sihir bu! SB3'ün ürettiği tüm TB loglarını internete pushlar
+        monitor_gym=True,       # İstersen ileride ortamın videosunu da pushlar
+    )
 
     # 🔥 İŞTE ÇÖZÜM: Global frekansı, toplam paralel ajan sayısına bölüyoruz
     global_save_freq = 250_000
@@ -68,11 +77,11 @@ def train():
         env,
         policy_kwargs=custom_policy_kwargs,
         verbose=0,
-        learning_rate=cosine_schedule(1e-5),
-        n_steps=512,           # JSBSim sürekli bir simülasyon olduğu için yüksek n_steps iyidir
-        n_epochs=3,
-        ent_coef=0.02,
-        batch_size=8192,
+        learning_rate=1e-5,
+        n_steps=2048,           # JSBSim sürekli bir simülasyon olduğu için yüksek n_steps iyidir
+        n_epochs=8,
+        ent_coef=0.08,
+        batch_size=16384,
         gamma=0.99,             # Gelecekteki ödüllerin önem katsayısı
         tensorboard_log="./dogfight_tensorboard/"
     )
@@ -82,10 +91,11 @@ def train():
     
     # 4. Modeli Eğit
     # İt dalaşı zor bir problemdir, anlamlı sonuçlar için bu sayıyı 1_000_000'a çıkarmanız gerekebilir.
-    model.learn(total_timesteps=15_000_000, callback=checkpoint_callback)
+    model.learn(total_timesteps=400_000_000, callback=[checkpoint_callback, WandbCallback()])
 
     # 5. Eğitilmiş Modeli Kaydet
     model.save("ppo_dogfight_final")
+    run.finish() 
     print("Eğitim tamamlandı ve model kaydedildi: ppo_dogfight_final.zip")
 
 
