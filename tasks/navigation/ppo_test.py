@@ -16,7 +16,7 @@ def test():
     
     # 🔥 İŞTE EKSİK OLAN VE HATAYI ÇÖZECEK SATIR BURASI 🔥
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/ppo_dogfight_final.zip" 
+    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/models_checkpoints/ppo_navigation_99942400_steps.zip" 
     model = PPO.load(model_path)
         
     obs = env.reset()
