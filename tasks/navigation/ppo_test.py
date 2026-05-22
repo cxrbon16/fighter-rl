@@ -3,64 +3,58 @@ import time
 import supersuit as ss
 from stable_baselines3 import PPO
 import numpy as np
-from dogfight_env import DogfightParallelEnv  # Dosya adın neyse ona göre değiştir
+from tasks.navigation.navigation import NavigationTaskEnv
 
 def test():
     print("Eğitilmiş model test ediliyor...")
     
-    # Test için render modunu açıyoruz (FlightGear veya Panda3D)
-    env = DogfightParallelEnv(render_mode="human")
-    
-    # 🔥 EĞİTİMDEKİ WRAPPER ZİNCİRİNİ BİREBİR KURUYORUZ
+    env = NavigationTaskEnv(render_mode="human")
+        
     env = ss.black_death_v3(env) 
-    env = ss.frame_stack_v1(env, stack_size=4) # 12 obs -> 48'e çıkıyor
+    env = ss.frame_stack_v1(env, stack_size=4) # 14 obs -> 56'ya çıkıyor
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     
-    # 🔥 DİKKAT: Eğittiğin modelin doğru yolunu (path) buraya gir!
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/playground/models/dogfight_ppo/ppo_dogfight_38247552_steps" 
+    # 🔥 İŞTE EKSİK OLAN VE HATAYI ÇÖZECEK SATIR BURASI 🔥
+    env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
+    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/ppo_dogfight_final.zip" 
     model = PPO.load(model_path)
         
-    # 1. Ortamı sıfırla
-    raw_obs = env.reset()
-    
-    # Emniyet kemerimiz: SuperSuit'in tuple'ından saf matrisi çıkar
-    if isinstance(raw_obs, tuple):
-        obs = raw_obs[0]
-    else:
-        obs = raw_obs
+    obs = env.reset()
 
     print("Simülasyon başladı! İzlemek için motora geçin...")
     
     for step in range(10000):
-        # Modelden aksiyonları al (deterministic=True ajanın saçmalamasını engeller)
         action, _states = model.predict(obs, deterministic=True)
         
-        # 5 değer dönüyoruz (terminated ve truncated dahil)
-        raw_obs, rewards, terminations, truncations, infos = env.step(action)
+        obs, rewards, dones, infos = env.step(action)
         
-        if isinstance(raw_obs, tuple):
-            obs = raw_obs[0]
-        else:
-            obs = raw_obs
-        
-        # --- HUD: TELEMETRİ PRINT BÖLÜMÜ ---
         if step % 5 == 0:
-            # Frame Stack yapıldığı için obs[0]'ı düzleştirip son 12 verinin (en taze karenin) ilk elemanını alıyoruz
-            irtifa_ft = obs[0].flatten()[-12] * 30000.0
+            latest_frame = obs[0].flatten()[-14:]
+            
+            irtifa_ft = latest_frame[0] * 30000.0
+            hiz_kts = latest_frame[1] * 1000.0
+            mesafe_ft = latest_frame[12] * 50000.0
+            sapma_radyan = latest_frame[13] * np.pi
+            
+            # 🔥 METRİK SİSTEME ÇEVİRİM 🔥
+            irtifa_m = irtifa_ft * 0.3048
+            hiz_ms = hiz_kts * 0.514444
+            mesafe_m = mesafe_ft * 0.3048
+            sapma_derece = sapma_radyan * (180.0 / np.pi)
             
             print(f"✈️ Adım: {step:04d} "
-                  f"| İrtifa: {irtifa_ft:05.0f} ft "
-                  f"| A1 Ödül: {rewards[0]:+06.2f} "
-                  f"| A1 Aksiyon (Ail/Elev/Thro): [{action[0][0]:+0.2f}, {action[0][1]:+0.2f}, {action[0][2]:+0.2f}]")
+                  f"| Hız: {hiz_ms:03.0f} m/s "
+                  f"| İrtifa: {irtifa_m:05.0f} m "
+                  f"| Hedefe: {mesafe_m:05.0f} m "
+                  f"| Açı Sapması: {sapma_derece:+04.0f}° "
+                  f"| Ödül: {rewards[0]:+06.2f} "
+                  f"| Aksiyon (A/E/T): [{action[0][0]:+0.2f}, {action[0][1]:+0.2f}, {action[0][2]:+0.2f}]")
         
-        # Yeniden doğma kontrolü
-        if terminations[0] or truncations[0]:
-            print("💥 Raund bitti (Elendi veya Süre Doldu)! Yeniden doğuyor...")
+        if dones[0]:
+            print("💥 Raund bitti (Elendi, Hedefe Vardı veya Süre Doldu)! Yeniden doğuyor...")
+            break  
             
-        # ⏱️ GERÇEK ZAMAN FRENİ (1x HIZ İÇİN)
-        # Fizik motorunda 8 frame (0.066s) atladığımız için, gerçek hayatta da
-        # o kadar süre bekletiyoruz ki uçak Matrix gibi x20 hızda akmasın.
-        time.sleep(8.0 / 120.0)
+        time.sleep(4.0 / 120.0)
 
 if __name__ == "__main__":
     test()

@@ -4,7 +4,7 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize
 # from dogfight_env import DogfightParallelEnv  # Ortamınızı içeren dosya
-from tasks.climb import ClimbTaskEnv
+from tasks.climb.climb import ClimbTaskEnv
 import torch
 from typing import Callable
 import numpy as np
@@ -50,7 +50,7 @@ def train():
     
     # JSBSim'in RAM ve CPU kullanımı yoğun olduğu için num_vec_envs=1 tutuyoruz.
     # Eğer sisteminiz güçlüyse num_vec_envs değerini artırıp eğitimi hızlandırabilirsiniz.
-    env = ss.concat_vec_envs_v1(env, num_vec_envs=4, num_cpus=1, base_class='stable_baselines3')
+    env = ss.concat_vec_envs_v1(env, num_vec_envs=256, num_cpus=8, base_class='stable_baselines3')
     env = VecMonitor(env)
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_reward=10.0)
 

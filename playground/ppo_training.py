@@ -3,8 +3,7 @@ import supersuit as ss
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize
-# from dogfight_env import DogfightParallelEnv  # Ortamınızı içeren dosya
-from tasks.climb import ClimbTaskEnv
+from dogfight_env import DogfightParallelEnv  # Ortamınızı içeren dosya
 import torch
 from typing import Callable
 import numpy as np
@@ -37,7 +36,7 @@ def cosine_schedule(initial_value: float) -> Callable[[float], float]:
 
 def train():
     # 1. Ortamı yarat (Eğitim sırasında render kapalı olmalı)
-    env = ClimbTaskEnv(render_mode="none")
+    env = DogfightParallelEnv(render_mode="none")
     
     # 2. PettingZoo ortamını SB3'ün anlayacağı VecEnv formatına çevir
     # Bu wrapper, ParallelEnv içindeki ajanları düzleştirerek tek bir politikanın
@@ -50,7 +49,7 @@ def train():
     
     # JSBSim'in RAM ve CPU kullanımı yoğun olduğu için num_vec_envs=1 tutuyoruz.
     # Eğer sisteminiz güçlüyse num_vec_envs değerini artırıp eğitimi hızlandırabilirsiniz.
-    env = ss.concat_vec_envs_v1(env, num_vec_envs=4, num_cpus=1, base_class='stable_baselines3')
+    env = ss.concat_vec_envs_v1(env, num_vec_envs=256, num_cpus=8, base_class='stable_baselines3')
     env = VecMonitor(env)
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_reward=10.0)
 
@@ -104,7 +103,7 @@ def test():
     print("Eğitilmiş model test ediliyor...")
     
     # Test için render modunu açıyoruz (Panda3D)
-    env = ClimbTaskEnv(render_mode="human")
+    env = DogfightParallelEnv(render_mode="human")
     
     # --- EĞİTİMDEKİ WRAPPER ZİNCİRİNİ EKSİKSİZ KURUYORUZ ---
     env = ss.black_death_v3(env) 

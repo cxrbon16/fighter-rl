@@ -49,7 +49,7 @@ def train():
     
     # JSBSim'in RAM ve CPU kullanımı yoğun olduğu için num_vec_envs=1 tutuyoruz.
     # Eğer sisteminiz güçlüyse num_vec_envs değerini artırıp eğitimi hızlandırabilirsiniz.
-    env = ss.concat_vec_envs_v1(env, num_vec_envs=256, num_cpus=8, base_class='stable_baselines3')
+    env = ss.concat_vec_envs_v1(env, num_vec_envs=128, num_cpus=8, base_class='stable_baselines3')
     env = VecMonitor(env)
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_reward=10.0)
 
@@ -78,7 +78,7 @@ def train():
         policy_kwargs=custom_policy_kwargs,
         verbose=0,
         learning_rate=1e-5,
-        n_steps=4096,           # JSBSim sürekli bir simülasyon olduğu için yüksek n_steps iyidir
+        n_steps=2048,           # JSBSim sürekli bir simülasyon olduğu için yüksek n_steps iyidir
         n_epochs=8,
         ent_coef=0.08,
         batch_size=16384,

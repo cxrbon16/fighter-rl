@@ -36,9 +36,9 @@ class NavigationTaskEnv(BaseF15Env):
             lon = fdm['position/long-gc-deg']
             
             # 0.1 derece yaklaşık 6-7 mil eder, başlangıç için ideal menzil
-            self.targets[agent] = (lat + np.random.uniform(-0.1, 0.1), 
-                                   lon + np.random.uniform(-0.1, 0.1), 
-                                   15000.0) # Hedef irtifa
+            self.targets[agent] = (lat + np.random.uniform(-0.05, 0.05), 
+                                   lon + np.random.uniform(-0.05, 0.05), 
+                                   np.random.uniform(10000.0, 20000.0)) # Hedef irtifa
             
             self.prev_dist[agent] = self._calculate_dist(agent)
 
@@ -79,7 +79,7 @@ class NavigationTaskEnv(BaseF15Env):
             norm_p, norm_q, norm_r, norm_energy
         ], dtype=np.float32)
         
-        return np.nan_to_num(obs, nan=0.0, posinf=1.0, neginf=-1.0)
+        obs = np.nan_to_num(obs, nan=0.0, posinf=1.0, neginf=-1.0)
 
         # Navigasyon Sensörleri
         dist = self._calculate_dist(agent_id)
@@ -105,18 +105,27 @@ class NavigationTaskEnv(BaseF15Env):
             if agent not in self.agents:
                  continue
             
+            # İRTİFAYI ÇEKİYORUZ
+            current_alt = self.fdms[agent]['position/h-sl-ft']
             current_dist = self._calculate_dist(agent)
             
-            # Ödül: Mesafedeki değişime göre (Yaklaştıkça artar)
-            rewards[agent] = (self.prev_dist[agent] - current_dist) / 500.0
-            
+            # Ödül: Mesafedeki değişime göre
+            rewards[agent] = (self.prev_dist[agent] - current_dist) / 100.0
             self.prev_dist[agent] = current_dist
             
-            # Hedefe varış (Örn: 1000 feet yarıçap)
+            terminations[agent] = False
+            
+            # 1. BİTİŞ KOŞULU: HEDEFE ULAŞMA (BAŞARI)
             if current_dist < 1000.0:
-                rewards[agent] += 100.0
+                rewards[agent] += 400.0
+                terminations[agent] = True
+                
+            # 2. BİTİŞ KOŞULU: YERE ÇAKILMA (İşte FPS'i kurtaracak satırlar!)
+            if current_alt < 1000.0:
+                rewards[agent] -= 70.0 # Yere çakılma cezası
                 terminations[agent] = True
             
-            truncations[agent] = self.fdms[agent].get_sim_time() > 60.0 # Süreyi 60'a çektik
+            # 3. BİTİŞ KOŞULU: SÜRE DOLMASI
+            truncations[agent] = self.fdms[agent].get_sim_time() > 60.0
             
         return rewards, terminations, truncations

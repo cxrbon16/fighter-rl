@@ -3,6 +3,8 @@ from gymnasium import spaces
 import jsbsim
 from functools import lru_cache
 
+jsbsim.FGJSBBase().debug_lvl = 0
+
 class BaseF15Env(ParallelEnv):
     metadata = {"render_modes": ["human", "none", "panda"], "name": "base_f15_v0"}
 
