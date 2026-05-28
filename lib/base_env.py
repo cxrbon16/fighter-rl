@@ -2,6 +2,7 @@ from pettingzoo import ParallelEnv
 from gymnasium import spaces
 import jsbsim
 from functools import lru_cache
+from pathlib import Path
 
 jsbsim.FGJSBBase().debug_lvl = 0
 
@@ -49,7 +50,9 @@ class BaseF15Env(ParallelEnv):
         
         f15_1 = jsbsim.FGFDMExec(None)
         if self.render_mode == "human":
-            f15_1.set_output_directive('/home/ayganyavuz/Desktop/dogfighting_rl/playground/fg_output.xml')
+            config_path = Path(__file__).resolve().parent.parent / 'config' / 'agent1_protocol.xml'
+            config_path_str = str(config_path)
+            f15_1.set_output_directive(config_path_str)
             
         f15_1.load_model('f15')
         f15_1['ic/lat-geod-deg'] = 37.6190
