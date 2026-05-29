@@ -104,7 +104,7 @@ class BaseF15Env(ParallelEnv):
             self.fdms["agent_1"].run()
 
         # 3. Alt Sınıftan (Task) Ödül ve Bitiş Durumlarını Al
-        rewards, terminations, truncations = self._calculate_rewards_and_dones()
+        rewards, terminations, truncations = self._calculate_rewards_and_dones(actions)
 
         # Temizlik
         for agent in self.possible_agents:

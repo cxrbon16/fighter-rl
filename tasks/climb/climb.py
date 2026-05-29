@@ -66,7 +66,7 @@ class ClimbTaskEnv(BaseF15Env):
         obs = np.nan_to_num(obs, nan=0.0, posinf=1.0, neginf=-1.0)
         return np.clip(obs, -5.0, 5.0)
 
-    def _calculate_rewards_and_dones(self):
+    def _calculate_rewards_and_dones(self, actions):
         rewards = {}
         terminations = {}
         truncations = {}

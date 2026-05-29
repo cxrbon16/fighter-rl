@@ -96,7 +96,7 @@ class NavigationTaskEnv(BaseF15Env):
         
         return np.concatenate([obs, nav_obs])
 
-    def _calculate_rewards_and_dones(self):
+    def _calculate_rewards_and_dones(self, actions):
         rewards = {}
         terminations = {}
         truncations = {}
@@ -125,8 +125,13 @@ class NavigationTaskEnv(BaseF15Env):
                 rewards[agent] -= 70.0 # Yere çakılma cezası
                 terminations[agent] = True
             
+            agent_actions = actions[agent]
+            
+            action_penalty = 0.03 * (agent_actions[0]**2 + agent_actions[1]**2 + agent_actions[2] ** 2) 
+            rewards[agent] -= action_penalty
+            
             # 3. BİTİŞ KOŞULU: SÜRE DOLMASI
-            truncations[agent] = self.fdms[agent].get_sim_time() > 60.0
+            truncations[agent] = self.fdms[agent].get_sim_time() > 120.0
             
         return rewards, terminations, truncations
     
