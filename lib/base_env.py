@@ -80,7 +80,9 @@ class BaseF15Env(ParallelEnv):
         self._task_reset()
         
         observations = {agent: self._get_obs(agent) for agent in self.agents}
-        infos = {agent: {} for agent in self.agents}
+        
+        infos = {agent: self._get_info(agent) for agent in self.agents}
+        infos = self._update_info(infos)
         
         return observations, infos
 
@@ -110,7 +112,9 @@ class BaseF15Env(ParallelEnv):
                 self.agents.remove(agent)
 
         observations = {agent: self._get_obs(agent) for agent in self.agents}
-        infos = {agent: {} for agent in self.agents}
+
+        infos = {agent: self._get_info(agent) for agent in self.agents}
+        infos = self._update_info(infos)
 
         self._render_frame()
 
@@ -128,6 +132,25 @@ class BaseF15Env(ParallelEnv):
             }
             p2_dummy_state = {'x': 0.0, 'y': 0.0, 'z': -50000.0, 'roll': 0.0, 'pitch': 0.0, 'yaw': 0.0}
             self.viewer.update_world(p1_state, p2_dummy_state)
+    
+    def _get_info(self, agent_id):
+        """Debug modundaysa saf telemetri verilerini infos sözlüğüne doldurur."""
+        if self.render_mode == "debug":
+            fdm = self.fdms[agent_id]
+            return {
+                "lat": fdm['position/lat-geod-deg'],
+                "lon": fdm['position/long-gc-deg'],
+                "alt_ft": fdm['position/h-sl-ft'],
+                "alt_m": fdm['position/h-sl-ft'] * 0.3048,
+                "roll_deg": fdm['attitude/phi-deg'],
+                "pitch_deg": fdm['attitude/theta-deg'],
+                "yaw_deg": fdm['attitude/psi-deg'],
+                "airspeed_kts": fdm['velocities/vc-kts'],
+                "airspeed_ms": fdm['velocities/vc-kts'] * 0.514444
+            }
+        
+        # Debug modunda değilsek FPS'i korumak için boş sözlük dön
+        return {}
 
     def _get_initial_conditions(self):
         raise NotImplementedError
@@ -140,3 +163,6 @@ class BaseF15Env(ParallelEnv):
 
     def _calculate_rewards_and_dones(self):
         raise NotImplementedError
+    
+    def _update_info(self, infos: dict):
+        return infos

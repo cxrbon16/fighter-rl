@@ -129,3 +129,15 @@ class NavigationTaskEnv(BaseF15Env):
             truncations[agent] = self.fdms[agent].get_sim_time() > 60.0
             
         return rewards, terminations, truncations
+    
+    def _update_info(self, infos: dict):
+        """Base sınıftan gelen saf F-15 telemetrisine, göreve özel Hedef (Target) verilerini ekler."""
+        for agent_id, agent_info in infos.items():
+            # Eğer debug modundaysak agent_info dolu gelir, içine target'ı gömelim
+            if agent_info: 
+                hedef = self.targets[agent_id]
+                agent_info['target_lat'] = hedef[0]
+                agent_info['target_lon'] = hedef[1]
+                agent_info['target_alt_m'] = hedef[2] * 0.3048 # Fitten metreye
+                
+        return infos
