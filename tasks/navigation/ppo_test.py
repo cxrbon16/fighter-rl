@@ -17,7 +17,7 @@ def test():
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/models_checkpoints/ppo_navigation_99942400_steps.zip" 
+    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/models_checkpoints/ppo_navigation_98443264_steps.zip" 
     model = PPO.load(model_path)
         
     obs = env.reset()
@@ -77,25 +77,33 @@ def test():
             rr.log("radar/f15_rota", rr.LineStrips3D([trajectory], colors=[255, 100, 100]))
 
         # Telemetri Ekranı (Değişiklik yok)
+
         if step % 5 == 0:
-            # 🔥 AGA BURASI: Artık obs'yi çarpmak yok, doğrudan saf JSBSim verisini (INFO) okuyoruz!
             irtifa_m = env_info['alt_m']
             hiz_ms = env_info['airspeed_ms'] 
             
-            # Hedefle olan gerçek 3D metrik mesafeyi Rerun koordinatlarından (Pisagor ile) buluyoruz:
-            #             
-            # Sadece hedef sapma açısını obs'den çekmeye devam edebiliriz 
-            # (Çünkü onu zaten -pi ile +pi arasında çok temiz hesaplamıştın)
-            latest_frame = obs[0].flatten()[-15:] 
-            sapma_radyan = latest_frame[13] * np.pi
-            sapma_derece = sapma_radyan * (180.0 / np.pi)
-
             mesafe_m = np.sqrt(x**2 + y**2 + (current_alt_m - target_alt_m)**2)
             
-            # Aksiyonları daha temiz yazdıralım
-            aileron = action[0][0]
-            elevator = action[0][1]
-            throttle = action[0][2]
+            latest_frame = obs[0].flatten()[-15:] 
+            sapma_derece = (latest_frame[13] * np.pi) * (180.0 / np.pi)
+            
+            aileron, elevator, throttle = action[0][0], action[0][1], action[0][2]
+            odul = rewards[0]
+            
+            # Terminale yazdırmaya devam edelim (konsolda da bulunsun)
+            log_metni = f"✈️ Adım: {step:04d} | Hız: {hiz_ms:03.0f} m/s | İrtifa: {irtifa_m:05.0f} m | Hedefe: {mesafe_m:05.0f} m | Açı: {sapma_derece:+04.0f}° | Ödül: {odul:+06.2f}"
+            print(log_metni)
+
+            rr.log("telemetri/metin", rr.TextLog(log_metni, level=rr.TextLogLevel.INFO))            
+            
+            rr.log("telemetri/grafik/hiz_ms", rr.Scalars(hiz_ms))
+            rr.log("telemetri/grafik/irtifa_m", rr.Scalars(irtifa_m))
+            rr.log("telemetri/grafik/hedefe_mesafe_m", rr.Scalars(mesafe_m))
+            rr.log("telemetri/grafik/odul", rr.Scalars(odul))
+            
+            rr.log("telemetri/aksiyon/aileron", rr.Scalars(aileron))
+            rr.log("telemetri/aksiyon/elevator", rr.Scalars(elevator))
+            rr.log("telemetri/aksiyon/throttle", rr.Scalars(throttle))
             
             print(f"✈️ Adım: {step:04d} | Hız: {hiz_ms:03.0f} m/s | İrtifa: {irtifa_m:05.0f} m | Hedefe: {mesafe_m:05.0f} m | Açı: {sapma_derece:+04.0f}° | Ödül: {rewards[0]:+06.2f} | Aks: [{aileron:+0.2f}, {elevator:+0.2f}, {throttle:+0.2f}]")            
         
