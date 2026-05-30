@@ -127,7 +127,7 @@ class NavigationTaskEnv(BaseF15Env):
             
             agent_actions = actions[agent]
             
-            action_penalty = 0.03 * (agent_actions[0]**2 + agent_actions[1]**2 + agent_actions[2] ** 2) 
+            action_penalty = 0.03 * (agent_actions[0]**2 + agent_actions[1]**2 + agent_actions[2]**2) 
             rewards[agent] -= action_penalty
             
             # 3. BİTİŞ KOŞULU: SÜRE DOLMASI
