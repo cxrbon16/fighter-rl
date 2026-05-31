@@ -198,6 +198,40 @@ class SelfPlayDogfightEnv(BaseEnv):
 
         return obs
 
+    def _get_info(self, agent_id):
+        fdm = self.fdms[agent_id]
+        opponent_id = next(uid for uid in self.fdms.keys() if uid != agent_id)
+        opp_fdm = self.fdms[opponent_id]
+        
+        self_x, self_y, self_z = fdm['position/ecef-x-ft'], fdm['position/ecef-y-ft'], fdm['position/ecef-z-ft']
+        opp_x, opp_y, opp_z = opp_fdm['position/ecef-x-ft'], opp_fdm['position/ecef-y-ft'], opp_fdm['position/ecef-z-ft']
+        dist_ft = np.sqrt((opp_x - self_x)**2 + (opp_y - self_y)**2 + (opp_z - self_z)**2)
+        
+        vt_fps = fdm['velocities/vt-fps']
+        alt_ft = fdm['position/h-sl-ft']
+        specific_energy = alt_ft + (vt_fps**2) / (2 * 32.174)
+        
+        info = {
+            "dist_ft": dist_ft,
+            "energy": specific_energy,
+            "tracking_time": self.tracking_time[agent_id]
+        }
+
+        if self.render_mode == "debug":
+            info.update({
+                "lat": fdm['position/lat-geod-deg'],
+                "lon": fdm['position/long-gc-deg'],
+                "alt_ft": fdm['position/h-sl-ft'],
+                "alt_m": fdm['position/h-sl-ft'] * 0.3048,
+                "roll_deg": fdm['attitude/phi-deg'],
+                "pitch_deg": fdm['attitude/theta-deg'],
+                "yaw_deg": fdm['attitude/psi-deg'],
+                "airspeed_kts": fdm['velocities/vc-kts'],
+                "airspeed_ms": fdm['velocities/vc-kts'] * 0.514444
+            })
+        
+        return info
+
     def _calculate_rewards_and_dones(self, actions):
         rewards = {agent: 0.0 for agent in self.possible_agents}
         terminations = {agent: False for agent in self.possible_agents}

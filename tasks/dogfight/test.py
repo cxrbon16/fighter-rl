@@ -20,7 +20,7 @@ def test_dogfight():
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
     
     # Eğittiğiniz modelin yolunu buraya girin (eğer yoksa rastgele hareket edecektir)
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/dogfight/models_checkpoints/ppo_dogfight_2500000_steps.zip" 
+    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/dogfight/models_checkpoints/ppo_dogfight_5500000_steps.zip" 
     try:
         model = PPO.load(model_path)
         print("Model başarıyla yüklendi!")
