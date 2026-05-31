@@ -12,6 +12,7 @@ class SelfPlayDogfightEnv(BaseEnv):
             agent: spaces.Box(low=-1.0, high=1.0, shape=(28,), dtype=np.float32)
             for agent in self.possible_agents
         }
+        self.prev_dist = 0
         
         self.tracking_time = {
             agent: 0 for agent in self.possible_agents
@@ -32,7 +33,10 @@ class SelfPlayDogfightEnv(BaseEnv):
         }
             
     def _task_reset(self):
-        pass
+        self.prev_dist = 0
+        self.tracking_time = {
+            agent: 0 for agent in self.possible_agents
+        }
 
     def _get_obs(self, agent_id):
         opponent_agent_id = next(uid for uid in self.fdms.keys() if uid != agent_id)
@@ -312,14 +316,22 @@ class SelfPlayDogfightEnv(BaseEnv):
 
             # Positioning & Geometry
             offensive_score = (1.0 - norm_ata) + (1.0 - norm_aa)
-            step_reward += (offensive_score - 1.0) * 0.1
+            step_reward += (offensive_score - 1.0) * 1.0
             
             # Energy 
             if norm_delta_energy > 0:
                 step_reward += 0.05
                 
             # Lethality (WEZ - Weapon Engagement Zone)
+            distance_delta =  current_dist - self.prev_dist
+            self.prev_dist = current_dist
+
+            distance_reward = (distance_delta / 10000.0) * 0.2
+            step_reward += distance_reward
+
             in_wez = current_dist < 3000.0 and ata_rad < (10.0 * np.pi / 180.0)
+
+
             
             if in_wez:
                  step_reward += 2.0
@@ -335,7 +347,7 @@ class SelfPlayDogfightEnv(BaseEnv):
                 step_reward -= 50.0
                 terminations[agent_id] = True
                 
-            elif self.tracking_time[agent_id] > 50:
+            elif self.tracking_time[agent_id] > 20:
                  step_reward += 100.0
                  terminations[agent_id] = True
                  terminations[opponent_id] = True
