@@ -45,7 +45,7 @@ class BaseEnv(ParallelEnv):
         self.fdms = {}
         
         # Take the initial conditions from the Task subclass. That gives us a vector of conditions for each agent in the env.
-        initial_conditions_list: Dict[Dict] = self._get_initial_conditions()
+        initial_conditions_list: Dict[str, Dict] = self._get_initial_conditions()
         
         # that will fill the fdms dictionary for each agent.
         for agent in self.agents:
