@@ -17,7 +17,7 @@ def test():
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/models_checkpoints/ppo_navigation_98443264_steps.zip" 
+    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/models_checkpoints/ppo_navigation_101192320_steps.zip" 
     model = PPO.load(model_path)
         
     obs = env.reset()
@@ -110,7 +110,6 @@ def test():
         if dones[0]:
             print("💥 Raund bitti (Elendi, Hedefe Vardı veya Süre Doldu)! Yeniden doğuyor...")
             trajectory.clear()
-            obs = env.reset()
             start_lat = None # Raund sıfırlandığında orijini de sıfırla
             continue
             

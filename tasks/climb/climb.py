@@ -1,10 +1,10 @@
 from gymnasium import spaces
 import numpy as np
-from lib.base_env import BaseF15Env
+from lib.base_env import BaseEnv
 
 
-class ClimbTaskEnv(BaseF15Env):
-    metadata = {"render_modes": ["human", "none", "panda"], "name": "dogfight_climb_v0"}
+class ClimbTaskEnv(BaseEnv):
+    metadata = {"render_modes": ["human", "none"], "name": "dogfight_climb_v0"}
 
     def __init__(self, render_mode="none"):
         # Base sınıfı ayağa kaldır

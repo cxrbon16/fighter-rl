@@ -1,14 +1,13 @@
 import numpy as np
 from gymnasium import spaces
-from lib.base_env import BaseF15Env
+from lib.base_env import BaseEnv
 
-class NavigationTaskEnv(BaseF15Env):
-    metadata = {"render_modes": ["human", "none", "panda"], "name": "dogfight_nav_v0"}
+class NavigationTaskEnv(BaseEnv):
+    metadata = {"render_modes": ["debug", "human", "none"], "name": "dogfight_nav_v0"}
 
     def __init__(self, render_mode="none"):
-        super().__init__(render_mode=render_mode)
+        super().__init__(number_of_agents=1, render_mode=render_mode, aircraft="f15")
         
-        # 🔥 OBS SPACE: 12 Aerodinamik + 2 Navigasyon (Mesafe ve Açı) = 14 Boyut
         self.observation_spaces = {
             agent: spaces.Box(low=-5.0, high=5.0, shape=(14,), dtype=np.float32)
             for agent in self.possible_agents
@@ -17,15 +16,23 @@ class NavigationTaskEnv(BaseF15Env):
         self.targets = {}
         self.prev_dist = {}
 
-    def _get_initial_conditions(self):
-        # Navigasyonda uçak biraz daha serbest olabilir
-        return {
+    def _get_initial_conditions(self):        
+        # fdm['ic/lat-geod-deg'] = initial_conditions.get("lat", 37.6190)
+        # fdm['ic/long-gc-deg'] = initial_conditions.get("long", -122.3749)
+
+        ics = {
             'alt': np.random.uniform(10000.0, 20000.0),
             'vc': np.random.uniform(350.0, 450.0),
             'pitch': np.random.uniform(-10.0, 10.0),
             'roll': np.random.uniform(-30.0, 30.0),
-            'yaw': np.random.uniform(-0.2, 0.2)
+            'yaw': np.random.uniform(-0.2, 0.2),
+            'lat': 37.6190 + np.random.uniform(-0.10, +0.10),
+            'long': -122.3749 + np.random.uniform(-0.10, +0.10),
         }
+
+        possible_agents = self._get_possible_agents()
+
+        return {agent: ics for agent in possible_agents}
 
     def _task_reset(self):
         # Her reset'te yeni bir hedef noktası generate et
@@ -36,8 +43,8 @@ class NavigationTaskEnv(BaseF15Env):
             lon = fdm['position/long-gc-deg']
             
             # 0.1 derece yaklaşık 6-7 mil eder, başlangıç için ideal menzil
-            self.targets[agent] = (lat + np.random.uniform(-0.05, 0.05), 
-                                   lon + np.random.uniform(-0.05, 0.05), 
+            self.targets[agent] = (lat + np.random.uniform(-0.30, 0.30), 
+                                   lon + np.random.uniform(-0.30, 0.30), 
                                    np.random.uniform(10000.0, 20000.0)) # Hedef irtifa
             
             self.prev_dist[agent] = self._calculate_dist(agent)
@@ -131,7 +138,7 @@ class NavigationTaskEnv(BaseF15Env):
             rewards[agent] -= action_penalty
             
             # 3. BİTİŞ KOŞULU: SÜRE DOLMASI
-            truncations[agent] = self.fdms[agent].get_sim_time() > 120.0
+            truncations[agent] = self.fdms[agent].get_sim_time() > 300.0
             
         return rewards, terminations, truncations
     
