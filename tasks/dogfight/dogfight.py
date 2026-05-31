@@ -256,6 +256,17 @@ class SelfPlayDogfightEnv(BaseEnv):
         rewards = {agent: 0.0 for agent in self.possible_agents}
         terminations = {agent: False for agent in self.possible_agents}
         truncations = {agent: False for agent in self.possible_agents}
+
+        # Ortak mesafeyi döngüden önce bir kez hesapla
+        fdm0 = self.fdms["agent_1"]
+        fdm1 = self.fdms["agent_2"]
+        p1 = np.array([fdm0['position/ecef-x-ft'], fdm0['position/ecef-y-ft'], fdm0['position/ecef-z-ft']])
+        p2 = np.array([fdm1['position/ecef-x-ft'], fdm1['position/ecef-y-ft'], fdm1['position/ecef-z-ft']])
+        current_dist = np.linalg.norm(p1 - p2)
+
+        # Yaklaşma ödülü (Pozitif ise yaklaşıyorlar)
+        distance_delta = self.prev_dist - current_dist if self.prev_dist > 0 else 0.0
+        self.prev_dist = current_dist
         
         for agent_id in self.possible_agents:
             if agent_id not in self.agents:
@@ -280,12 +291,7 @@ class SelfPlayDogfightEnv(BaseEnv):
             delta_energy = specific_energy - opp_specific_energy
             norm_delta_energy = delta_energy / 50000.0
             
-            # Distance calcs.
-            self_x, self_y, self_z = fdm['position/ecef-x-ft'], fdm['position/ecef-y-ft'], fdm['position/ecef-z-ft']
-            opp_x, opp_y, opp_z = opp_fdm['position/ecef-x-ft'], opp_fdm['position/ecef-y-ft'], opp_fdm['position/ecef-z-ft']
-            current_dist = np.sqrt((opp_x - self_x)**2 + (opp_y - self_y)**2 + (opp_z - self_z)**2)
-            
-            # ATA and AA calcs.
+            # ATA and AA calcs. (current_dist zaten yukarıda var)
             lat1, lon1 = fdm['position/lat-geod-rad'], fdm['position/long-gc-rad']
             lat2, lon2 = opp_fdm['position/lat-geod-rad'], opp_fdm['position/long-gc-rad']
             R_ft = 20925000.0
@@ -348,10 +354,7 @@ class SelfPlayDogfightEnv(BaseEnv):
             self.reward_components[agent_id]["delta_energy_reward"] = en_reward
                 
             # Lethality (WEZ - Weapon Engagement Zone)
-            distance_delta =  current_dist - self.prev_dist
-            self.prev_dist = current_dist
-
-            dist_reward = (distance_delta / 10000.0) * 0.2
+            dist_reward = (distance_delta / 200.0) * 0.2
             step_reward += dist_reward
             self.reward_components[agent_id]["distance_reward"] = dist_reward
 
