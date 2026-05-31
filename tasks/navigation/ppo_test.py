@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation as R
 def test():
     print("Eğitilmiş model test ediliyor...")
     
-    base_env = NavigationTaskEnv(render_mode="human")
+    base_env = NavigationTaskEnv(render_mode="debug")
         
     env = ss.black_death_v3(base_env) 
     env = ss.frame_stack_v1(env, stack_size=4) 
@@ -28,8 +28,15 @@ def test():
     def get_aircraft_quat(roll, pitch, yaw):
         """JSBSim (NED) Euler açılarından Rerun (ENU) Quaternion'a temiz dönüşüm."""
         base_rot = R.from_euler('x', 90, degrees=True)
-        flight_rot = R.from_euler('zyx', [90 - yaw, -pitch, roll], degrees=True)
+        
+        # 'zyx' sırası (Yaw -> Pitch -> Roll) havacılık standardıdır.
+        # Yaw (Heading): 90 - yaw
+        # Pitch: -pitch
+        # Roll: roll
+        flight_rot = R.from_euler('xyz', [roll, -pitch, 90 - yaw], degrees=True)
+        
         return (flight_rot * base_rot).as_quat()
+
 
     rr.log(
         "radar/f16/model",

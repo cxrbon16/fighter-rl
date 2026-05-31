@@ -20,7 +20,7 @@ def test_dogfight():
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
     
     # Eğittiğiniz modelin yolunu buraya girin (eğer yoksa rastgele hareket edecektir)
-    model_path = "tasks/dogfight/models_checkpoints/ppo_dogfight_1500000_steps.zip" 
+    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/dogfight/models_checkpoints/ppo_dogfight_2500000_steps.zip" 
     try:
         model = PPO.load(model_path)
         print("Model başarıyla yüklendi!")
@@ -33,28 +33,14 @@ def test_dogfight():
     
     def get_aircraft_quat(roll, pitch, yaw):
         """JSBSim (NED) Euler açılarından Rerun (ENU) Quaternion'a temiz dönüşüm."""
-        # 1. Modelin kendi eksenini düzelt (GLB modelinin burnu genelde +Y veya +Z'dir)
-        # Sizin 'hack' kısmındaki +90 derece X rotasyonu modeli ayağa kaldırıyor.
         base_rot = R.from_euler('x', 90, degrees=True)
         
-        # 2. Uçuş rotasyonunu uygula:
-        # Yaw (Heading): JSBSim'de 0=Kuzey, Saat yönünde artar. ENU'da 90=Kuzey, Saat yönü tersi artar.
-        # Bu yüzden 90 - yaw kullanımı doğrudur.
-        # Pitch: Uçağın burnunu yukarı/aşağı kaldırır.
-        # Roll: Uçağı kendi ekseninde döndürür.
         # 'zyx' sırası (Yaw -> Pitch -> Roll) havacılık standardıdır.
-        base_rot = R.from_euler('x', +90, degrees=True)
-
-        flight_rot = R.from_euler(
-            'xyz',
-            [
-                info_0['roll_deg'],
-                -info_0['pitch_deg'],
-                -info_0['yaw_deg'] + 90
-            ],
-            degrees=True
-        )
-
+        # Yaw (Heading): 90 - yaw
+        # Pitch: -pitch
+        # Roll: roll
+        flight_rot = R.from_euler('xyz', [roll, -pitch, 90 - yaw], degrees=True)
+        
         return (flight_rot * base_rot).as_quat()
 
         
