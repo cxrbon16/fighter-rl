@@ -19,6 +19,7 @@ class SelfPlayDogfightEnv(BaseEnv):
         }
         self.reward_components = {
             agent: {
+                "survival_reward": 0.0,
                 "g_limit_penalty": 0.0,
                 "action_penalty": 0.0,
                 "offensive_reward": 0.0,
@@ -26,7 +27,9 @@ class SelfPlayDogfightEnv(BaseEnv):
                 "distance_reward": 0.0,
                 "wez_reward": 0.0,
                 "crash_penalty": 0.0,
-                "victory_reward": 0.0
+                "out_of_bounds_penalty": 0.0,
+                "victory_reward": 0.0,
+                "defeat_penalty": 0.0
             } for agent in self.possible_agents
         }
 
@@ -234,8 +237,10 @@ class SelfPlayDogfightEnv(BaseEnv):
             "dist_ft": dist_ft,
             "energy": specific_energy,
             "tracking_time": self.tracking_time[agent_id],
-            "reward_components": self.reward_components[agent_id]
         }
+        
+        if not getattr(self, "is_resetting", False):
+            info["reward_components"] = self.reward_components[agent_id]
 
         if self.render_mode == "debug":
             info.update({
@@ -256,6 +261,10 @@ class SelfPlayDogfightEnv(BaseEnv):
         rewards = {agent: 0.0 for agent in self.possible_agents}
         terminations = {agent: False for agent in self.possible_agents}
         truncations = {agent: False for agent in self.possible_agents}
+
+        for agent in self.possible_agents:
+            for key in self.reward_components[agent]:
+                self.reward_components[agent][key] = 0.0
 
         # Ortak mesafeyi döngüden önce bir kez hesapla
         fdm0 = self.fdms["agent_1"]
@@ -325,8 +334,10 @@ class SelfPlayDogfightEnv(BaseEnv):
             step_reward = 0.0
 
             # Survival Reward
-            step_reward += 0.05 
-            
+            survival_reward = 0.05
+            step_reward += survival_reward
+            self.reward_components[agent_id]["survival_reward"] = survival_reward
+
             # G Limit
             g_limit_p = 0.0
             if g_force > 9.0 or g_force < -3.0:
@@ -371,6 +382,7 @@ class SelfPlayDogfightEnv(BaseEnv):
 
             crash_p = 0.0
             vic_reward = 0.0
+            out_of_bounds_p = 0.0
 
             if current_alt < 1000.0:
                 crash_p = -100.0
@@ -378,7 +390,8 @@ class SelfPlayDogfightEnv(BaseEnv):
                 terminations[agent_id] = True
                 
             elif current_dist > 150000.0: 
-                step_reward -= 50.0
+                out_of_bounds_p = -50.0
+                step_reward += out_of_bounds_p
                 terminations[agent_id] = True
                 
             elif self.tracking_time[agent_id] > 20:
@@ -387,9 +400,10 @@ class SelfPlayDogfightEnv(BaseEnv):
                  terminations[agent_id] = True
                  terminations[opponent_id] = True
                  rewards[opponent_id] -= 100.0
-                 # Ajan 1 kazandıysa agent_2 de ceza yer, onu da loglamalıyız ama şimdilik kazananınkini tutalım
+                 self.reward_components[opponent_id]["defeat_penalty"] = -100.0
             
             self.reward_components[agent_id]["crash_penalty"] = crash_p
+            self.reward_components[agent_id]["out_of_bounds_penalty"] = out_of_bounds_p
             self.reward_components[agent_id]["victory_reward"] = vic_reward
 
             if fdm.get_sim_time() > 180.0:

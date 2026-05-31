@@ -19,6 +19,7 @@ class BaseEnv(ParallelEnv):
 
         self.possible_agents = [f"agent_{idx + 1}" for idx in range(number_of_agents)]
         self.agents = self.possible_agents[:]
+        self.is_resetting = False
         
         # (aileron, elevator, throttle), all three in range (-1.0, 1.0)
         self.action_spaces = {
@@ -41,6 +42,7 @@ class BaseEnv(ParallelEnv):
         return self.action_spaces[agent]
 
     def reset(self, seed=None, options=None):
+        self.is_resetting = True
         self.agents = self.possible_agents[:]
         self.fdms = {}
         
@@ -98,6 +100,7 @@ class BaseEnv(ParallelEnv):
         infos = {agent: self._get_info(agent) for agent in self.agents}
         infos = self._update_info(infos)
         
+        self.is_resetting = False
         return observations, infos
 
     def step(self, actions: Dict[str, List[int]]):
@@ -122,17 +125,17 @@ class BaseEnv(ParallelEnv):
         # Take rewards, terminations, truncations from the subclass.
         rewards, terminations, truncations = self._calculate_rewards_and_dones(actions)
 
-        # Apply terminanations and truncations.
-        for agent in self.possible_agents:
-            if (terminations.get(agent) or truncations.get(agent)) and (agent in self.agents):
-                self.agents.remove(agent)
-
         # Get observations from the subclass.
         observations = {agent: self._get_obs(agent) for agent in self.agents}
 
         # Get extra informations from the subclass.
         infos = {agent: self._get_info(agent) for agent in self.agents}
         infos = self._update_info(infos)
+
+        # Apply terminanations and truncations.
+        for agent in self.possible_agents:
+            if (terminations.get(agent) or truncations.get(agent)) and (agent in self.agents):
+                self.agents.remove(agent)
 
         return observations, rewards, terminations, truncations, infos
     
