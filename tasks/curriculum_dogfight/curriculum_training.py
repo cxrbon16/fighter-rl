@@ -84,14 +84,15 @@ custom_policy_kwargs = dict(
 PHASES = [
     {
         "name": "Phase_1_Basics",
-        "timesteps": 50_000_000,
+        "timesteps": 40_000_000,
         "reward_weights": {
             "survival_reward": 1.0,
             "crash_penalty": 1.0,
             "out_of_bounds_penalty": 1.0,
-            "delta_energy_reward": 0.0,
-            "action_penalty": 1.0,
-            "g_limit_penalty": 1.0,
+            "delta_energy_reward": 0.5,
+
+            "action_penalty": 0.4,
+            "g_limit_penalty": 0.0,
 
             "distance_reward": 0.0,
             "offensive_reward": 0.0,
@@ -100,9 +101,10 @@ PHASES = [
             "defeat_penalty": 0.0
         }
     },
+
     {
         "name": "Phase_2_Approaching_and_Offensive",
-        "timesteps": 50_000_000,
+        "timesteps": 200_000_000,
         "reward_weights": {
             "survival_reward": 0.3,
             "crash_penalty": 0.3,
@@ -112,16 +114,16 @@ PHASES = [
             
             "distance_reward": 1.0,
             "offensive_reward": 1.0,
-            "g_limit_penalty": 1.0,
+            "g_limit_penalty": 0.0,
             
-            "wez_reward": 0.0,
-            "victory_reward": 0.0,
-            "defeat_penalty": 0.0
+            "wez_reward": 1.0,
+            "victory_reward": 1.0,
+            "defeat_penalty": 1.0
         }
     },
     {
         "name": "Phase_3_WEZ_and_Victory",
-        "timesteps": 100_000_000,
+        "timesteps": 1_000_000_000,
         "reward_weights": {
             "survival_reward": 0.2,
             "crash_penalty": 0.2,
@@ -131,11 +133,11 @@ PHASES = [
             
             "distance_reward": 0.5,
             "offensive_reward": 0.5,
-            "g_limit_penalty": 1.0,
+            "g_limit_penalty": 0.0,
             
-            "wez_reward": 1.0,
-            "victory_reward": 1.0,
-            "defeat_penalty": 1.0
+            "wez_reward": 5.0,
+            "victory_reward": 5.0,
+            "defeat_penalty": 0.8,
         }
     }
 ]
@@ -143,9 +145,9 @@ PHASES = [
 def make_env(reward_weights):
     env = SelfPlayDogfightEnv(render_mode="none", reward_weights=reward_weights)
     env = ss.black_death_v3(env) 
-    env = ss.frame_stack_v1(env, stack_size=4)
+    env = ss.frame_stack_v1(env, stack_size=8)
     env = ss.pettingzoo_env_to_vec_env_v1(env)
-    env = ss.concat_vec_envs_v1(env, num_vec_envs=64, num_cpus=8, base_class='stable_baselines3')
+    env = ss.concat_vec_envs_v1(env, num_vec_envs=256, num_cpus=8, base_class='stable_baselines3')
     env = VecMonitor(env)
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_reward=10.0)
     return env
@@ -172,30 +174,36 @@ def train():
         
         # Load previous vec normalize stats if available
         if previous_model_path and os.path.exists(previous_model_path + "_vecnormalize.pkl"):
+            print(f"Loading VecNormalize stats from {previous_model_path}_vecnormalize.pkl")
             env = VecNormalize.load(previous_model_path + "_vecnormalize.pkl", env)
             env.training = True
 
         if model is None:
-            # First phase, initialize the model
-            model = PPO(
-                "MlpPolicy",
-                env,
-                policy_kwargs=custom_policy_kwargs,
-                verbose=1,
-                learning_rate=1e-5,
-                n_steps=4096,
-                n_epochs=3,
-                ent_coef=0.01,
-                batch_size=16384,
-                gamma=0.99,
-                tensorboard_log=f"./tasks/curriculum_dogfight/tensorboard/{phase['name']}/"
-            )
+            if previous_model_path and os.path.exists(previous_model_path + ".zip"):
+                print(f"Loading existing model from {previous_model_path}.zip")
+                model = PPO.load(previous_model_path, env=env)
+                model.tensorboard_log = f"./tasks/curriculum_dogfight/tensorboard/{phase['name']}/"
+            else:
+                # First phase, initialize the model
+                model = PPO(
+                    "MlpPolicy",
+                    env,
+                    policy_kwargs=custom_policy_kwargs,
+                    verbose=1,
+                    learning_rate=1e-5,
+                    n_steps=8192,
+                    n_epochs=3,
+                    ent_coef=0.1,
+                    batch_size=16384,
+                    gamma=0.99,
+                    tensorboard_log=f"./tasks/curriculum_dogfight/tensorboard/{phase['name']}/"
+                )
         else:
             # Subsequent phases, update env and reset learning rate / internals if necessary
             model.set_env(env)
             model.tensorboard_log = f"./tasks/curriculum_dogfight/tensorboard/{phase['name']}/"
 
-        global_save_freq = 500_000
+        global_save_freq = 5_000_000
         real_save_freq = max(1, global_save_freq // env.num_envs)
 
         checkpoint_callback = CheckpointCallback(
@@ -208,7 +216,7 @@ def train():
         model.learn(
             total_timesteps=phase["timesteps"], 
             callback=[checkpoint_callback, WandbCallback(), metrics_callback],
-            reset_num_timesteps=False # Keep timesteps continuous across phases
+            reset_num_timesteps=True # Keep timesteps continuous across phases
         )
 
         # Save model and normalization stats at the end of phase
