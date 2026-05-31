@@ -12,36 +12,36 @@ from wandb.integration.sb3 import WandbCallback
 class DogfightMetricsCallback(BaseCallback):
     def __init__(self, verbose=0):
         super(DogfightMetricsCallback, self).__init__(verbose)
-        self.episode_dists = []
-        self.episode_energies = []
-        self.episode_tracking_times = []
-        self.agent_wins = {"agent_1": 0, "agent_2": 0}
+        self.env_data = {} # Her env_idx için ayrı veri tutacağız
 
     def _on_step(self) -> bool:
-        for info in self.locals['infos']:
-            if 'dist_ft' in info:
-                self.episode_dists.append(info['dist_ft'])
-            if 'energy' in info:
-                self.episode_energies.append(info['energy'])
-            if 'tracking_time' in info:
-                self.episode_tracking_times.append(info['tracking_time'])
+        n_envs = len(self.locals['dones'])
+        
+        # İlk adımda env_data sözlüğünü başlat
+        if not self.env_data:
+            for i in range(n_envs):
+                self.env_data[i] = {"dists": [], "energies": [], "tracking": []}
 
-        for done, info in zip(self.locals['dones'], self.locals['infos']):
+        for i, (info, done) in enumerate(zip(self.locals['infos'], self.locals['dones'])):
+            # Verileri topla ve NaN kontrolü yap
+            dist = info.get('dist_ft', 0)
+            energy = info.get('energy', 0)
+            tracking = info.get('tracking_time', 0)
+
+            # JSBSim NaN dönerse 0 kabul et
+            self.env_data[i]["dists"].append(np.nan_to_num(dist))
+            self.env_data[i]["energies"].append(np.nan_to_num(energy))
+            self.env_data[i]["tracking"].append(np.nan_to_num(tracking))
+
             if done:
-                if 'dist_ft' in info:
-                    self.logger.record("metrics/avg_distance_ft", np.mean(self.episode_dists))
-                    self.logger.record("metrics/avg_energy", np.mean(self.episode_energies))
-                    self.logger.record("metrics/avg_tracking_time", np.mean(self.episode_tracking_times))
+                # Sadece veri varsa logla (NaN önlemek için)
+                if len(self.env_data[i]["dists"]) > 0:
+                    self.logger.record("metrics/avg_distance_ft", np.mean(self.env_data[i]["dists"]))
+                    self.logger.record("metrics/avg_energy", np.mean(self.env_data[i]["energies"]))
+                    self.logger.record("metrics/avg_tracking_time", np.mean(self.env_data[i]["tracking"]))
                     
-                    # Kazanan tespiti: tracking_time > 50 olan kazanmıştır
-                    if info.get('tracking_time', 0) >= 50:
-                        # Bu info hangi ajana aitse o kazanmıştır, ama VecEnv'de bunu anlamak 
-                        # info içindeki yapıya göre değişir. PettingZoo VecEnv'de ajanlar ardışıktır.
-                        pass 
-
-                    self.episode_dists = []
-                    self.episode_energies = []
-                    self.episode_tracking_times = []
+                    # Verileri sıfırla
+                    self.env_data[i] = {"dists": [], "energies": [], "tracking": []}
         return True
 
 custom_policy_kwargs = dict(
