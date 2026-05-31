@@ -23,8 +23,8 @@ class SelfPlayDogfightEnv(BaseEnv):
             {
                 'alt': np.random.uniform(10000.0, 20000.0),
                 'vc': np.random.uniform(350.0, 450.0),
-                'pitch': np.random.uniform(-10.0, 10.0),
-                'roll': np.random.uniform(-30.0, 30.0),
+                'pitch': 0.0,
+                'roll': 0.0,
                 'yaw': np.random.uniform(0.0, 360.0),
                 'lat': 37.6190 + np.random.uniform(-0.10, +0.10),
                 'long': -122.3749 + np.random.uniform(-0.10, +0.10),

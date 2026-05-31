@@ -4,3 +4,4 @@ dogfight_tensorboard/
 *.zip
 *.pdf
 wandb/
+static/*

@@ -5,6 +5,7 @@ from stable_baselines3 import PPO
 import numpy as np
 import rerun as rr
 from tasks.dogfight.dogfight import SelfPlayDogfightEnv 
+from scipy.spatial.transform import Rotation as R
 
 def test_dogfight():
     print("Eğitilmiş Dogfight modeli test ediliyor...")
@@ -19,7 +20,7 @@ def test_dogfight():
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
     
     # Eğittiğiniz modelin yolunu buraya girin (eğer yoksa rastgele hareket edecektir)
-    model_path = "models/ppo_dogfight_model.zip" 
+    model_path = "tasks/dogfight/models_checkpoints/ppo_dogfight_1500000_steps.zip" 
     try:
         model = PPO.load(model_path)
         print("Model başarıyla yüklendi!")
@@ -30,6 +31,45 @@ def test_dogfight():
     # 2. Rerun Başlatma
     rr.init("F16_Dogfight_Arena", spawn=True)    
     
+    def get_aircraft_quat(roll, pitch, yaw):
+        """JSBSim (NED) Euler açılarından Rerun (ENU) Quaternion'a temiz dönüşüm."""
+        # 1. Modelin kendi eksenini düzelt (GLB modelinin burnu genelde +Y veya +Z'dir)
+        # Sizin 'hack' kısmındaki +90 derece X rotasyonu modeli ayağa kaldırıyor.
+        base_rot = R.from_euler('x', 90, degrees=True)
+        
+        # 2. Uçuş rotasyonunu uygula:
+        # Yaw (Heading): JSBSim'de 0=Kuzey, Saat yönünde artar. ENU'da 90=Kuzey, Saat yönü tersi artar.
+        # Bu yüzden 90 - yaw kullanımı doğrudur.
+        # Pitch: Uçağın burnunu yukarı/aşağı kaldırır.
+        # Roll: Uçağı kendi ekseninde döndürür.
+        # 'zyx' sırası (Yaw -> Pitch -> Roll) havacılık standardıdır.
+        base_rot = R.from_euler('x', +90, degrees=True)
+
+        flight_rot = R.from_euler(
+            'xyz',
+            [
+                info_0['roll_deg'],
+                -info_0['pitch_deg'],
+                -info_0['yaw_deg'] + 90
+            ],
+            degrees=True
+        )
+
+        return (flight_rot * base_rot).as_quat()
+
+        
+
+
+    rr.log(
+        "radar/agent_0/model",
+        rr.Asset3D(path="/home/ayganyavuz/Desktop/dogfighting_rl/static/f16.glb")
+    )
+
+    rr.log(
+        "radar/agent_1/model",
+        rr.Asset3D(path="/home/ayganyavuz/Desktop/dogfighting_rl/static/f16.glb")
+    )
+
     obs = env.reset()
     
     # Kuyruk izlerini tutmak için sözlük (İki ajan için ayrı ayrı)
@@ -54,8 +94,6 @@ def test_dogfight():
             
         obs, rewards, dones, infos = env.step(action)
         
-        # PettingZoo'da dones bir array döner (ajan sayısı kadar)
-        # Eğer herhangi biri bittiyse raund bitmiştir.
         if any(dones):
             print(f"💥 Raund bitti! Adım: {step} | Ortam sıfırlanıyor...")
             trajectories['agent_0'].clear()
@@ -64,10 +102,6 @@ def test_dogfight():
             origin_lat = None # Orijini sıfırla
             continue
 
-        # 3. Rerun Çizimi ve Loglama
-        # `infos` içinden iki ajanın da verilerini çekmeliyiz.
-        # Not: SelfPlayDogfightEnv'de step fonksiyonunun info döndürdüğünden emin ol.
-        # Şimdilik BaseEnv'in fdm'ine doğrudan erişerek çiziyoruz (daha pratik).
         
 
         info_0, info_1 = infos[0], infos[1]
@@ -88,8 +122,19 @@ def test_dogfight():
         x_0 = (lon_0 - origin_lon) * lon_to_m
         y_0 = (lat_0 - origin_lat) * lat_to_m
         z_0 = alt_0_m
-        
-        rr.log("radar/agent_0/ucak", rr.Points3D([x_0, y_0, z_0], colors=[0, 100, 255], radii=150.0))
+
+        rot_0 = get_aircraft_quat(info_0['roll_deg'], info_0['pitch_deg'], info_0['yaw_deg'])
+
+        rr.log(
+            "radar/agent_0/model",
+            rr.Transform3D(
+                translation=[x_0, y_0, z_0],
+                rotation=rr.Quaternion(xyzw=rot_0),
+                scale=1.0
+            )
+        )
+
+
         trajectories['agent_0'].append([x_0, y_0, z_0])
         if len(trajectories['agent_0']) > 2:
             rr.log("radar/agent_0/rota", rr.LineStrips3D([trajectories['agent_0']], colors=[100, 150, 255]))
@@ -103,7 +148,19 @@ def test_dogfight():
         y_1 = (lat_1 - origin_lat) * lat_to_m
         z_1 = alt_1_m
         
-        rr.log("radar/agent_1/ucak", rr.Points3D([x_1, y_1, z_1], colors=[255, 50, 50], radii=150.0))
+        rot_1 = get_aircraft_quat(info_1['roll_deg'], info_1['pitch_deg'], info_1['yaw_deg'])
+
+        rr.log(
+            "radar/agent_1/model",
+            rr.Transform3D(
+                translation=[x_1, y_1, z_1],
+                rotation=rr.Quaternion(xyzw=rot_1),
+                scale=1.0
+            )
+        )
+
+
+
         trajectories['agent_1'].append([x_1, y_1, z_1])
         if len(trajectories['agent_1']) > 2:
             rr.log("radar/agent_1/rota", rr.LineStrips3D([trajectories['agent_1']], colors=[255, 100, 100]))

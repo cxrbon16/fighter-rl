@@ -5,12 +5,13 @@ from stable_baselines3 import PPO
 import numpy as np
 from tasks.navigation.navigation import NavigationTaskEnv
 import rerun as rr
+from scipy.spatial.transform import Rotation as R
 
 
 def test():
     print("Eğitilmiş model test ediliyor...")
     
-    base_env = NavigationTaskEnv(render_mode="debug")
+    base_env = NavigationTaskEnv(render_mode="human")
         
     env = ss.black_death_v3(base_env) 
     env = ss.frame_stack_v1(env, stack_size=4) 
@@ -22,7 +23,18 @@ def test():
         
     obs = env.reset()
     trajectory = []
-    rr.init("F15_Dogfight_Radar", spawn=True)    
+    rr.init("F16_Navigation_Arena", spawn=True)    
+
+    def get_aircraft_quat(roll, pitch, yaw):
+        """JSBSim (NED) Euler açılarından Rerun (ENU) Quaternion'a temiz dönüşüm."""
+        base_rot = R.from_euler('x', 90, degrees=True)
+        flight_rot = R.from_euler('zyx', [90 - yaw, -pitch, roll], degrees=True)
+        return (flight_rot * base_rot).as_quat()
+
+    rr.log(
+        "radar/f16/model",
+        rr.Asset3D(path="/home/ayganyavuz/Desktop/dogfighting_rl/static/f16.glb")
+    )
     
     print("Simülasyon başladı! İzlemek için motora geçin...")
     
@@ -67,14 +79,24 @@ def test():
 
         target_x, target_y, target_z = 0.0, 0.0, target_alt_m
         
-        # Uçağı Çiz (Hedef Çizimini Kaldırdık)
-        rr.log("radar/f15", rr.Points3D([x, y, z], colors=[255, 0, 0], radii=150.0))
+        # Uçağı Çiz
+        rot = get_aircraft_quat(env_info['roll_deg'], env_info['pitch_deg'], env_info['yaw_deg'])
+        
+        rr.log(
+            "radar/f16/model",
+            rr.Transform3D(
+                translation=[x, y, z],
+                rotation=rr.Quaternion(xyzw=rot),
+                scale=1.0
+            )
+        )
+
         rr.log("radar/hedef", rr.Points3D([target_x, target_y, target_z], colors=[0, 255, 0], radii=150.0))
         
         # Uçağın Kuyruk İzini Çiz
         trajectory.append([x, y, z])
         if len(trajectory) > 2:
-            rr.log("radar/f15_rota", rr.LineStrips3D([trajectory], colors=[255, 100, 100]))
+            rr.log("radar/f16_rota", rr.LineStrips3D([trajectory], colors=[255, 100, 100]))
 
         # Telemetri Ekranı (Değişiklik yok)
 
