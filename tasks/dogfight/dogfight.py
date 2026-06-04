@@ -10,7 +10,7 @@ class SelfPlayDogfightEnv(BaseEnv):
         "g_limit_penalty":      1.0,
         "action_penalty":       1.0,
         "offensive_reward":     1.0,
-        "delta_energy_reward":  1.0,
+        "delta_energy_reward":  0.1,
         "distance_reward":      1.0,
         "wez_reward":           1.0,
         "crash_penalty":        1.0,
@@ -321,10 +321,11 @@ class SelfPlayDogfightEnv(BaseEnv):
             self.reward_components[agent_id]["action_penalty"] = action_p
             self._prev_action[agent_id] = np.array(agent_actions, dtype=np.float32)
 
-            # Positioning & Geometry — gated by range: nose-on pays only inside ~5 nm,
-            # full weight inside ~1 nm. Removes the long-range point-and-circle exploit.
+            # Positioning & Geometry — gated by range: nose-on pays only inside ~5 nm and
+            # keeps climbing all the way to WEZ range (full weight at ~3000 ft), so there is
+            # a gradient for the final approach and parking just outside guns is not optimal.
             offensive_score = (1.0 - norm_ata) + (1.0 - norm_aa)
-            closeness = np.clip((30000.0 - current_dist) / 24000.0, 0.0, 1.0)
+            closeness = np.clip((30000.0 - current_dist) / 27000.0, 0.0, 1.0)
             off_reward = (offensive_score - 1.0) * closeness * self.reward_weights["offensive_reward"]
             step_reward += off_reward
             self.reward_components[agent_id]["offensive_reward"] = off_reward
