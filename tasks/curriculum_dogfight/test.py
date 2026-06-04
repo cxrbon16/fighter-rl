@@ -15,12 +15,11 @@ def test_dogfight():
     
     # Çoklu ajan wrapper'ları (Önceki yapınızla uyumlu)
     env = ss.black_death_v3(base_env) 
-    env = ss.frame_stack_v1(env, stack_size=4) 
+    env = ss.frame_stack_v1(env, stack_size=8) 
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
     
-    # Eğittiğiniz modelin yolunu buraya girin (eğer yoksa rastgele hareket edecektir)
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/dogfight/models_checkpoints/ppo_dogfight_7999488_steps.zip" 
+    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/curriculum_dogfight/Phase_2_Approaching_and_Offensive_final.zip" 
     try:
         model = PPO.load(model_path)
         print("Model başarıyla yüklendi!")
@@ -161,9 +160,12 @@ def test_dogfight():
             # Sadece ajan 0'ın ödülünü yazdırıyoruz
             odul_0 = float(rewards[0])
             
+            a0_aileron, a0_elevator, a0_throttle = action[0]
+            a1_aileron, a1_elevator, a1_throttle = action[1]
+            
             log_metni = (f"⚔️ Adım: {step:04d} | Mesafe: {mesafe_m:05.0f}m | "
-                         f"A0: {hiz_0_kts:03.0f}kts, {alt_0_m:05.0f}m | "
-                         f"A1: {hiz_1_kts:03.0f}kts, {alt_1_m:05.0f}m | Ödül: {odul_0:+05.2f}")
+                         f"A0: {hiz_0_kts:03.0f}kts, {alt_0_m:05.0f}m, Act: [{a0_elevator:+.2f}, {a0_aileron:+.2f}, {a0_throttle:+.2f}] | "
+                         f"A1: {hiz_1_kts:03.0f}kts, {alt_1_m:05.0f}m, Act: [{a1_elevator:+.2f}, {a1_aileron:+.2f}, {a1_throttle:+.2f}] | Ödül: {odul_0:+05.2f}")
             print(log_metni)
 
             rr.log("telemetri/metin", rr.TextLog(log_metni, level=rr.TextLogLevel.INFO))            

@@ -147,7 +147,7 @@ def make_env(reward_weights):
     env = ss.black_death_v3(env) 
     env = ss.frame_stack_v1(env, stack_size=8)
     env = ss.pettingzoo_env_to_vec_env_v1(env)
-    env = ss.concat_vec_envs_v1(env, num_vec_envs=256, num_cpus=8, base_class='stable_baselines3')
+    env = ss.concat_vec_envs_v1(env, num_vec_envs=32, num_cpus=8, base_class='stable_baselines3')
     env = VecMonitor(env)
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_reward=10.0)
     return env

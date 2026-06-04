@@ -361,7 +361,7 @@ class SelfPlayDogfightEnv(BaseEnv):
 
             # Stability                
             agent_actions = actions[agent_id]
-            action_p = -0.03 * (agent_actions[0]**2 + agent_actions[1]**2 + agent_actions[2]**2) * self.reward_weights["action_penalty"]
+            action_p = -0.03 * (agent_actions[0]**2 + agent_actions[1]**2) * self.reward_weights["action_penalty"]
             step_reward += action_p
             self.reward_components[agent_id]["action_penalty"] = action_p
 

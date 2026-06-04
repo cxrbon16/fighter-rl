@@ -20,7 +20,7 @@ def test_dogfight():
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
     
     # Eğittiğiniz modelin yolunu buraya girin (eğer yoksa rastgele hareket edecektir)
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/dogfight/models_checkpoints/ppo_dogfight_5500000_steps.zip" 
+    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/dogfight/models_checkpoints/ppo_dogfight_7999488_steps.zip" 
     try:
         model = PPO.load(model_path)
         print("Model başarıyla yüklendi!")
@@ -81,7 +81,7 @@ def test_dogfight():
         obs, rewards, dones, infos = env.step(action)
         
         if any(dones):
-            print(f"💥 Raund bitti! Adım: {step} | Ortam sıfırlanıyor...")
+            print(f"bitti! Adım: {step} | Ortam sıfırlanıyor...")
             trajectories['agent_0'].clear()
             trajectories['agent_1'].clear()
             obs = env.reset()
