@@ -10,12 +10,18 @@ jsbsim.FGJSBBase().debug_lvl = 0
 class BaseEnv(ParallelEnv):
     metadata = {"render_modes": ["debug", "human", "none"], "name": "base_env"}
 
-    def __init__(self, number_of_agents, render_mode="none", aircraft="f16"):
+    def __init__(self, number_of_agents, render_mode="none", aircraft="f16",
+                 sim_rate_hz=60, substeps=4):
         super().__init__()
-        
+
         self.render_mode = render_mode
         self.aircraft = aircraft
         self.number_of_agents = number_of_agents
+
+        # JSBSim integration rate and substeps per RL step. 60 Hz x 4 substeps keeps the
+        # same ~15 Hz decision cadence as the old 120 Hz x 8 at roughly half the sim cost.
+        self.sim_rate_hz = sim_rate_hz
+        self.substeps = substeps
 
         self.possible_agents = [f"agent_{idx + 1}" for idx in range(number_of_agents)]
         self.agents = self.possible_agents[:]
@@ -61,6 +67,7 @@ class BaseEnv(ParallelEnv):
                 fdm.set_output_directive(config_path_str)
                 
             fdm.load_model(self.aircraft)
+            fdm.set_dt(1.0 / self.sim_rate_hz)
             fdm['ic/lat-geod-deg'] = initial_conditions.get("lat", 37.6190)
             fdm['ic/long-gc-deg'] = initial_conditions.get("long", -122.3749)
             
@@ -117,8 +124,8 @@ class BaseEnv(ParallelEnv):
             if self.aircraft == 'f15':
                 fdm['fcs/throttle-cmd-norm[1]'] = throttle
 
-        # Wait for 8 simulation step.
-        for _ in range(8):
+        # Advance the flight dynamics by self.substeps integration steps per RL step.
+        for _ in range(self.substeps):
             for agent_id, fdm in self.fdms.items():
                 fdm.run()
 
