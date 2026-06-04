@@ -2,77 +2,14 @@ import os
 from datetime import datetime
 import supersuit as ss
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
+from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize
 from tasks.dogfight.dogfight import SelfPlayDogfightEnv
+from tasks.callbacks import DogfightMetricsCallback
 import torch
 import numpy as np
 import wandb
 from wandb.integration.sb3 import WandbCallback
-
-class DogfightMetricsCallback(BaseCallback):
-    def __init__(self, verbose=0):
-        super(DogfightMetricsCallback, self).__init__(verbose)
-        self.env_data = {} 
-
-    def _on_step(self) -> bool:
-        n_envs = len(self.locals['dones'])
-        
-        if not self.env_data:
-            for i in range(n_envs):
-                self.env_data[i] = {
-                    "dists": [], 
-                    "energies": [], 
-                    "tracking": [],
-                    "rewards": {
-                        "survival_reward": [],
-                        "g_limit_penalty": [],
-                        "action_penalty": [],
-                        "offensive_reward": [],
-                        "delta_energy_reward": [],
-                        "distance_reward": [],
-                        "wez_reward": [],
-                        "crash_penalty": [],
-                        "out_of_bounds_penalty": [],
-                        "victory_reward": [],
-                        "defeat_penalty": []
-                    }
-                }
-
-        for i, (info, done) in enumerate(zip(self.locals['infos'], self.locals['dones'])):
-            dist = info.get('dist_ft', 0)
-            energy = info.get('energy', 0)
-            tracking = info.get('tracking_time', 0)
-
-            self.env_data[i]["dists"].append(np.nan_to_num(dist))
-            self.env_data[i]["energies"].append(np.nan_to_num(energy))
-            self.env_data[i]["tracking"].append(np.nan_to_num(tracking))
-            
-            # Reward detaylarını topla
-            comps = info.get('reward_components', {})
-            for key in self.env_data[i]["rewards"].keys():
-                val = comps.get(key, 0.0)
-                self.env_data[i]["rewards"][key].append(np.nan_to_num(val))
-
-            if done:
-                if len(self.env_data[i]["dists"]) > 0:
-                    self.logger.record("metrics/avg_distance_ft", np.mean(self.env_data[i]["dists"]))
-                    self.logger.record("metrics/avg_energy", np.mean(self.env_data[i]["energies"]))
-                    self.logger.record("metrics/avg_tracking_time", np.mean(self.env_data[i]["tracking"]))
-                    
-                    # Reward section logları
-                    for key, values in self.env_data[i]["rewards"].items():
-                        if len(values) > 0:
-                            self.logger.record(f"rewards/{key}", np.sum(values))
-                    
-                    # Verileri sıfırla
-                    self.env_data[i] = {
-                        "dists": [], 
-                        "energies": [], 
-                        "tracking": [],
-                        "rewards": {k: [] for k in self.env_data[i]["rewards"].keys()}
-                    }
-        return True
 
 custom_policy_kwargs = dict(
     activation_fn=torch.nn.Tanh,
