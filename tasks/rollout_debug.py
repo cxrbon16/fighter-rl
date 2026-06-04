@@ -40,7 +40,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 
 def make_env(task: str, reward_weights=None):
     if task == "curriculum":
-        from tasks.curriculum_dogfight.dogfight import SelfPlayDogfightEnv
+        from tasks.dogfight.dogfight import SelfPlayDogfightEnv
         base = SelfPlayDogfightEnv(render_mode="debug", reward_weights=reward_weights)
         stack = 8
     else:
