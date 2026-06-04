@@ -4,5 +4,7 @@ dogfight_tensorboard/
 tensorboard/
 *.zip
 *.pdf
+*.pkl
 wandb/
 static/*
+tasks/debug_runs/
