@@ -4,7 +4,7 @@ import supersuit as ss
 from stable_baselines3 import PPO
 import numpy as np
 import rerun as rr
-from tasks.dogfight.dogfight import SelfPlayDogfightEnv 
+from tasks.dogfight.dogfight import SelfPlayDogfightEnv  # single source of truth 
 from scipy.spatial.transform import Rotation as R
 
 def test_dogfight():

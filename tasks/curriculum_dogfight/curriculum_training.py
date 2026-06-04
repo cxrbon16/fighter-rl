@@ -4,7 +4,7 @@ import supersuit as ss
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
 from stable_baselines3.common.vec_env import VecMonitor, VecNormalize
-from tasks.curriculum_dogfight.dogfight import SelfPlayDogfightEnv
+from tasks.dogfight.dogfight import SelfPlayDogfightEnv
 import torch
 import numpy as np
 import wandb

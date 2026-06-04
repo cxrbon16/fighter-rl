@@ -5,9 +5,25 @@ from lib.base_env import BaseEnv
 class SelfPlayDogfightEnv(BaseEnv):
     metadata = {"render_modes": ["debug", "human", "none"], "name": "dogfight_v0"}
 
-    def __init__(self, render_mode="none"):
+    DEFAULT_REWARD_WEIGHTS = {
+        "survival_reward":      1.0,
+        "g_limit_penalty":      1.0,
+        "action_penalty":       1.0,
+        "offensive_reward":     1.0,
+        "delta_energy_reward":  1.0,
+        "distance_reward":      1.0,
+        "wez_reward":           1.0,
+        "crash_penalty":        1.0,
+        "out_of_bounds_penalty": 1.0,
+        "victory_reward":       1.0,
+        "defeat_penalty":       1.0,
+    }
+
+    def __init__(self, render_mode="none", reward_weights=None):
         super().__init__(number_of_agents=2, render_mode=render_mode, aircraft="f16")
-        
+
+        self.reward_weights = reward_weights or self.DEFAULT_REWARD_WEIGHTS
+
         self.observation_spaces = {
             agent: spaces.Box(low=-1.0, high=1.0, shape=(28,), dtype=np.float32)
             for agent in self.possible_agents
@@ -334,38 +350,38 @@ class SelfPlayDogfightEnv(BaseEnv):
             step_reward = 0.0
 
             # Survival Reward
-            survival_reward = 0.05
+            survival_reward = 0.05 * self.reward_weights["survival_reward"]
             step_reward += survival_reward
             self.reward_components[agent_id]["survival_reward"] = survival_reward
 
             # G Limit
             g_limit_p = 0.0
             if g_force > 9.0 or g_force < -3.0:
-                g_limit_p = -0.5
+                g_limit_p = -0.5 * self.reward_weights["g_limit_penalty"]
                 step_reward += g_limit_p
             self.reward_components[agent_id]["g_limit_penalty"] = g_limit_p
 
-            # Stability                
+            # Stability
             agent_actions = actions[agent_id]
-            action_p = -0.03 * (agent_actions[0]**2 + agent_actions[1]**2 + agent_actions[2]**2)
+            action_p = -0.03 * (agent_actions[0]**2 + agent_actions[1]**2) * self.reward_weights["action_penalty"]
             step_reward += action_p
             self.reward_components[agent_id]["action_penalty"] = action_p
 
             # Positioning & Geometry
             offensive_score = (1.0 - norm_ata) + (1.0 - norm_aa)
-            off_reward = (offensive_score - 1.0) * 1.0
+            off_reward = (offensive_score - 1.0) * 1.0 * self.reward_weights["offensive_reward"]
             step_reward += off_reward
             self.reward_components[agent_id]["offensive_reward"] = off_reward
-            
-            # Energy 
+
+            # Energy
             en_reward = 0.0
             if norm_delta_energy > 0:
-                en_reward = 0.05
+                en_reward = 0.05 * self.reward_weights["delta_energy_reward"]
                 step_reward += en_reward
             self.reward_components[agent_id]["delta_energy_reward"] = en_reward
-                
+
             # Lethality (WEZ - Weapon Engagement Zone)
-            dist_reward = (distance_delta / 200.0) * 0.2
+            dist_reward = (distance_delta / 200.0) * 0.2 * self.reward_weights["distance_reward"]
             step_reward += dist_reward
             self.reward_components[agent_id]["distance_reward"] = dist_reward
 
@@ -373,11 +389,11 @@ class SelfPlayDogfightEnv(BaseEnv):
 
             wez_reward = 0.0
             if in_wez:
-                 wez_reward = 2.0
-                 step_reward += wez_reward
-                 self.tracking_time[agent_id] += 1
+                wez_reward = 2.0 * self.reward_weights["wez_reward"]
+                step_reward += wez_reward
+                self.tracking_time[agent_id] += 1
             else:
-                 self.tracking_time[agent_id] = max(0, self.tracking_time[agent_id] - 1) 
+                self.tracking_time[agent_id] = max(0, self.tracking_time[agent_id] - 1)
             self.reward_components[agent_id]["wez_reward"] = wez_reward
 
             crash_p = 0.0
@@ -385,22 +401,22 @@ class SelfPlayDogfightEnv(BaseEnv):
             out_of_bounds_p = 0.0
 
             if current_alt < 1000.0:
-                crash_p = -100.0
+                crash_p = -100.0 * self.reward_weights["crash_penalty"]
                 step_reward += crash_p
                 terminations[agent_id] = True
-                
-            elif current_dist > 150000.0: 
-                out_of_bounds_p = -50.0
+
+            elif current_dist > 150000.0:
+                out_of_bounds_p = -50.0 * self.reward_weights["out_of_bounds_penalty"]
                 step_reward += out_of_bounds_p
                 terminations[agent_id] = True
-                
+
             elif self.tracking_time[agent_id] > 20:
-                 vic_reward = 100.0
-                 step_reward += vic_reward
-                 terminations[agent_id] = True
-                 terminations[opponent_id] = True
-                 rewards[opponent_id] -= 100.0
-                 self.reward_components[opponent_id]["defeat_penalty"] = -100.0
+                vic_reward = 100.0 * self.reward_weights["victory_reward"]
+                step_reward += vic_reward
+                terminations[agent_id] = True
+                terminations[opponent_id] = True
+                rewards[opponent_id] -= 100.0 * self.reward_weights["defeat_penalty"]
+                self.reward_components[opponent_id]["defeat_penalty"] = -100.0 * self.reward_weights["defeat_penalty"]
             
             self.reward_components[agent_id]["crash_penalty"] = crash_p
             self.reward_components[agent_id]["out_of_bounds_penalty"] = out_of_bounds_p
