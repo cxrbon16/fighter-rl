@@ -1,3 +1,4 @@
+from pathlib import Path
 import supersuit as ss
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -8,6 +9,8 @@ from typing import Callable
 import numpy as np
 import wandb
 from wandb.integration.sb3 import WandbCallback
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 custom_policy_kwargs = dict(
     activation_fn=torch.nn.Tanh,  
@@ -59,10 +62,10 @@ def train():
         name_prefix='ppo_navigation'
     )
 
-    checkpoint_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/models_checkpoints/ppo_navigation_99942400_steps.zip"
+    checkpoint_path = REPO_ROOT / "tasks/navigation/models_checkpoints/ppo_navigation_99942400_steps.zip"
     
     if checkpoint_path is not None:
-        print(f"📦 Önceki eğitimden devam ediliyor: {checkpoint_path}")
+        print(f"Önceki eğitimden devam ediliyor: {checkpoint_path}")
         # Modeli yüklerken 'env' parametresini vermek ZORUNLUDUR!
         # custom_objects: Eğer özel bir learning rate (cosine_schedule) kullanıyorsan 
         # SB3'ün hata vermemesi için bunu da geçmen faydalı olabilir.
@@ -73,7 +76,7 @@ def train():
             custom_objects={"lr_schedule": cosine_schedule(1e-5)} # Özel LR fonksiyonunu tekrar tanıtıyoruz
         )
     else:
-        print("🌱 Sıfırdan yepyeni bir model eğitiliyor...")
+        print("Sıfırdan yeni bir model eğitiliyor...")
         model = PPO(
             "MlpPolicy",
             env,
@@ -123,22 +126,22 @@ def test():
         # Artık obs %100 homojen bir NumPy matrisi, predict anında çalışacak
         action, _states = model.predict(obs, deterministic=True)
         
-        # 🔄 SB3 VecEnv kullanınca step() tam 4 değer döndürür 
+        # SB3 VecEnv kullanınca step() tam 4 değer döndürür
         # (terminated ve truncated arka planda birleşip 'dones' olur)
         obs, rewards, dones, infos = env.step(action)
         
         # --- TELEMETRİ PRINT BÖLÜMÜ ---
         if step % 5 == 0:
-            print(f"✈️ Adım: {step:04d} "
+            print(f"Adım: {step:04d} "
                   f"| A1 Ödül: {rewards[0]:.2f} "
                   f"| A2 Ödül: {rewards[1]:.2f} "
                   f"| A1 Aksiyon (Ail/Elev/Thro): [{action[0][0]:.2f}, {action[0][1]:.2f}, {action[0][2]:.2f}]")
         
         # dones dizisi, 1. veya 2. ajanın (index 0 veya 1) o adımda ölüp ölmediğini söyler
         if dones[0]:
-            print("💥 Agent 1 elendi veya süre bitti! Yeniden doğuyor...")
+            print("Agent 1 elendi veya süre bitti! Yeniden doğuyor...")
         if dones[1]:
-            print("💥 Agent 2 elendi veya süre bitti! Yeniden doğuyor...")
+            print("Agent 2 elendi veya süre bitti! Yeniden doğuyor...")
 
 if __name__ == "__main__":
     # Önce eğitimi çalıştır

@@ -1,11 +1,14 @@
 import os
 import time
+from pathlib import Path
 import supersuit as ss
 from stable_baselines3 import PPO
 import numpy as np
 import rerun as rr
-from tasks.dogfight.dogfight import SelfPlayDogfightEnv 
+from tasks.dogfight.dogfight import SelfPlayDogfightEnv
 from scipy.spatial.transform import Rotation as R
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def test_dogfight():
     print("Eğitilmiş Dogfight modeli test ediliyor...")
@@ -20,7 +23,7 @@ def test_dogfight():
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
     
     # Eğittiğiniz modelin yolunu buraya girin (eğer yoksa rastgele hareket edecektir)
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/dogfight/models_checkpoints/ppo_dogfight_7999488_steps.zip" 
+    model_path = REPO_ROOT / "tasks/dogfight/models_checkpoints/ppo_dogfight_7999488_steps.zip"
     try:
         model = PPO.load(model_path)
         print("Model başarıyla yüklendi!")
@@ -48,12 +51,12 @@ def test_dogfight():
 
     rr.log(
         "radar/agent_0/model",
-        rr.Asset3D(path="/home/ayganyavuz/Desktop/dogfighting_rl/static/f16.glb")
+        rr.Asset3D(path=str(REPO_ROOT / "static/f16.glb"))
     )
 
     rr.log(
         "radar/agent_1/model",
-        rr.Asset3D(path="/home/ayganyavuz/Desktop/dogfighting_rl/static/f16.glb")
+        rr.Asset3D(path=str(REPO_ROOT / "static/f16.glb"))
     )
 
     obs = env.reset()
@@ -161,7 +164,7 @@ def test_dogfight():
             # Sadece ajan 0'ın ödülünü yazdırıyoruz
             odul_0 = float(rewards[0])
             
-            log_metni = (f"⚔️ Adım: {step:04d} | Mesafe: {mesafe_m:05.0f}m | "
+            log_metni = (f"Adım: {step:04d} | Mesafe: {mesafe_m:05.0f}m | "
                          f"A0: {hiz_0_kts:03.0f}kts, {alt_0_m:05.0f}m | "
                          f"A1: {hiz_1_kts:03.0f}kts, {alt_1_m:05.0f}m | Ödül: {odul_0:+05.2f}")
             print(log_metni)

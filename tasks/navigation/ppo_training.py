@@ -60,7 +60,7 @@ def train():
         monitor_gym=True,       # İstersen ileride ortamın videosunu da pushlar
     )
 
-    # 🔥 İŞTE ÇÖZÜM: Global frekansı, toplam paralel ajan sayısına bölüyoruz
+    # Global frekansı, toplam paralel ajan sayısına bölüyoruz
     global_save_freq = 250_000
     real_save_freq = max(1, global_save_freq // env.num_envs)
 
@@ -123,22 +123,22 @@ def test():
         # Artık obs %100 homojen bir NumPy matrisi, predict anında çalışacak
         action, _states = model.predict(obs, deterministic=True)
         
-        # 🔄 SB3 VecEnv kullanınca step() tam 4 değer döndürür 
+        # SB3 VecEnv kullanınca step() tam 4 değer döndürür
         # (terminated ve truncated arka planda birleşip 'dones' olur)
         obs, rewards, dones, infos = env.step(action)
         
         # --- TELEMETRİ PRINT BÖLÜMÜ ---
         if step % 5 == 0:
-            print(f"✈️ Adım: {step:04d} "
+            print(f"Adım: {step:04d} "
                   f"| A1 Ödül: {rewards[0]:.2f} "
                   f"| A2 Ödül: {rewards[1]:.2f} "
                   f"| A1 Aksiyon (Ail/Elev/Thro): [{action[0][0]:.2f}, {action[0][1]:.2f}, {action[0][2]:.2f}]")
         
         # dones dizisi, 1. veya 2. ajanın (index 0 veya 1) o adımda ölüp ölmediğini söyler
         if dones[0]:
-            print("💥 Agent 1 elendi veya süre bitti! Yeniden doğuyor...")
+            print("Agent 1 elendi veya süre bitti! Yeniden doğuyor...")
         if dones[1]:
-            print("💥 Agent 2 elendi veya süre bitti! Yeniden doğuyor...")
+            print("Agent 2 elendi veya süre bitti! Yeniden doğuyor...")
 
 if __name__ == "__main__":
     # Önce eğitimi çalıştır

@@ -9,7 +9,7 @@ class NavigationTaskEnv(BaseEnv):
         super().__init__(number_of_agents=1, render_mode=render_mode, aircraft="f15")
         
         self.observation_spaces = {
-            agent: spaces.Box(low=-5.0, high=5.0, shape=(14,), dtype=np.float32)
+            agent: spaces.Box(low=-1.0, high=1.0, shape=(14,), dtype=np.float32)
             for agent in self.possible_agents
         }
         
@@ -51,8 +51,9 @@ class NavigationTaskEnv(BaseEnv):
 
     def _calculate_dist(self, agent):
         fdm = self.fdms[agent]
-        d_lat = (fdm['position/lat-geod-deg'] - self.targets[agent][0]) * 364000 # feet (yaklaşık)
-        d_long = (fdm['position/long-gc-deg'] - self.targets[agent][1]) * 364000
+        lat_deg = fdm['position/lat-geod-deg']
+        d_lat = (lat_deg - self.targets[agent][0]) * 364000
+        d_long = (fdm['position/long-gc-deg'] - self.targets[agent][1]) * 364000 * np.cos(np.radians(lat_deg))
         return np.sqrt(d_lat**2 + d_long**2)
 
     def _get_obs(self, agent_id):
@@ -101,7 +102,7 @@ class NavigationTaskEnv(BaseEnv):
         # Yeni verileri matrise ekle
         nav_obs = np.array([dist / 50000.0, bearing_error / np.pi], dtype=np.float32)
         
-        return np.concatenate([obs, nav_obs])
+        return np.clip(np.concatenate([obs, nav_obs]), -1.0, 1.0)
 
     def _calculate_rewards_and_dones(self, actions):
         rewards = {}

@@ -1,11 +1,14 @@
 import os
 import time
+from pathlib import Path
 import supersuit as ss
 from stable_baselines3 import PPO
 import numpy as np
 import rerun as rr
-from tasks.dogfight.dogfight import SelfPlayDogfightEnv  # single source of truth 
+from tasks.dogfight.dogfight import SelfPlayDogfightEnv
 from scipy.spatial.transform import Rotation as R
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 def test_dogfight():
     print("Eğitilmiş Dogfight modeli test ediliyor...")
@@ -19,7 +22,7 @@ def test_dogfight():
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
     
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/curriculum_dogfight/Phase_2_Approaching_and_Offensive_final.zip" 
+    model_path = REPO_ROOT / "tasks/curriculum_dogfight/Phase_2_Approaching_and_Offensive_final.zip"
     try:
         model = PPO.load(model_path)
         print("Model başarıyla yüklendi!")
@@ -47,12 +50,12 @@ def test_dogfight():
 
     rr.log(
         "radar/agent_0/model",
-        rr.Asset3D(path="/home/ayganyavuz/Desktop/dogfighting_rl/static/f16.glb")
+        rr.Asset3D(path=str(REPO_ROOT / "static/f16.glb"))
     )
 
     rr.log(
         "radar/agent_1/model",
-        rr.Asset3D(path="/home/ayganyavuz/Desktop/dogfighting_rl/static/f16.glb")
+        rr.Asset3D(path=str(REPO_ROOT / "static/f16.glb"))
     )
 
     obs = env.reset()
@@ -163,7 +166,7 @@ def test_dogfight():
             a0_aileron, a0_elevator, a0_throttle = action[0]
             a1_aileron, a1_elevator, a1_throttle = action[1]
             
-            log_metni = (f"⚔️ Adım: {step:04d} | Mesafe: {mesafe_m:05.0f}m | "
+            log_metni = (f"Adım: {step:04d} | Mesafe: {mesafe_m:05.0f}m | "
                          f"A0: {hiz_0_kts:03.0f}kts, {alt_0_m:05.0f}m, Act: [{a0_elevator:+.2f}, {a0_aileron:+.2f}, {a0_throttle:+.2f}] | "
                          f"A1: {hiz_1_kts:03.0f}kts, {alt_1_m:05.0f}m, Act: [{a1_elevator:+.2f}, {a1_aileron:+.2f}, {a1_throttle:+.2f}] | Ödül: {odul_0:+05.2f}")
             print(log_metni)

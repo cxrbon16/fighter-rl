@@ -1,11 +1,14 @@
 import os
 import time
+from pathlib import Path
 import supersuit as ss
 from stable_baselines3 import PPO
 import numpy as np
 from tasks.navigation.navigation import NavigationTaskEnv
 import rerun as rr
 from scipy.spatial.transform import Rotation as R
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test():
@@ -18,7 +21,7 @@ def test():
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     
     env = ss.concat_vec_envs_v1(env, num_vec_envs=1, num_cpus=1, base_class='stable_baselines3')    
-    model_path = "/home/ayganyavuz/Desktop/dogfighting_rl/tasks/navigation/models_checkpoints/ppo_navigation_101192320_steps.zip" 
+    model_path = REPO_ROOT / "tasks/navigation/models_checkpoints/ppo_navigation_101192320_steps.zip"
     model = PPO.load(model_path)
         
     obs = env.reset()
@@ -40,7 +43,7 @@ def test():
 
     rr.log(
         "radar/f16/model",
-        rr.Asset3D(path="/home/ayganyavuz/Desktop/dogfighting_rl/static/f16.glb")
+        rr.Asset3D(path=str(REPO_ROOT / "static/f16.glb"))
     )
     
     print("Simülasyon başladı! İzlemek için motora geçin...")
@@ -57,7 +60,7 @@ def test():
 
         if not env_info:
             if dones[0]:
-                print("💥 Raund bitti! Ortam sıfırlanıyor...")
+                print("Raund bitti! Ortam sıfırlanıyor...")
                 trajectory.clear()
                 obs = env.reset()
                 start_lat = None # Raund bitince orijini sıfırla
@@ -120,7 +123,7 @@ def test():
             odul = rewards[0]
             
             # Terminale yazdırmaya devam edelim (konsolda da bulunsun)
-            log_metni = f"✈️ Adım: {step:04d} | Hız: {hiz_ms:03.0f} m/s | İrtifa: {irtifa_m:05.0f} m | Hedefe: {mesafe_m:05.0f} m | Açı: {sapma_derece:+04.0f}° | Ödül: {odul:+06.2f}"
+            log_metni = f"Adım: {step:04d} | Hız: {hiz_ms:03.0f} m/s | İrtifa: {irtifa_m:05.0f} m | Hedefe: {mesafe_m:05.0f} m | Açı: {sapma_derece:+04.0f}° | Ödül: {odul:+06.2f}"
             print(log_metni)
 
             rr.log("telemetri/metin", rr.TextLog(log_metni, level=rr.TextLogLevel.INFO))            
@@ -134,10 +137,10 @@ def test():
             rr.log("telemetri/aksiyon/elevator", rr.Scalars(elevator))
             rr.log("telemetri/aksiyon/throttle", rr.Scalars(throttle))
             
-            print(f"✈️ Adım: {step:04d} | Hız: {hiz_ms:03.0f} m/s | İrtifa: {irtifa_m:05.0f} m | Hedefe: {mesafe_m:05.0f} m | Açı: {sapma_derece:+04.0f}° | Ödül: {rewards[0]:+06.2f} | Aks: [{aileron:+0.2f}, {elevator:+0.2f}, {throttle:+0.2f}]")            
+            print(f"Adım: {step:04d} | Hız: {hiz_ms:03.0f} m/s | İrtifa: {irtifa_m:05.0f} m | Hedefe: {mesafe_m:05.0f} m | Açı: {sapma_derece:+04.0f}° | Ödül: {rewards[0]:+06.2f} | Aks: [{aileron:+0.2f}, {elevator:+0.2f}, {throttle:+0.2f}]")            
         
         if dones[0]:
-            print("💥 Raund bitti (Elendi, Hedefe Vardı veya Süre Doldu)! Yeniden doğuyor...")
+            print("Raund bitti (Elendi, Hedefe Vardı veya Süre Doldu)! Yeniden doğuyor...")
             trajectory.clear()
             start_lat = None # Raund sıfırlandığında orijini de sıfırla
             continue

@@ -11,7 +11,7 @@ class ClimbTaskEnv(BaseEnv):
         
         # Göreve Özel: Sadece 12 Boyutlu Sensör Paketi
         self.observation_spaces = {
-            agent: spaces.Box(low=-5.0, high=5.0, shape=(12,), dtype=np.float32)
+            agent: spaces.Box(low=-1.0, high=1.0, shape=(12,), dtype=np.float32)
             for agent in self.possible_agents
         }
         
@@ -63,7 +63,7 @@ class ClimbTaskEnv(BaseEnv):
         ], dtype=np.float32)
         
         obs = np.nan_to_num(obs, nan=0.0, posinf=1.0, neginf=-1.0)
-        return np.clip(obs, -5.0, 5.0)
+        return np.clip(obs, -1.0, 1.0)
 
     def _calculate_rewards_and_dones(self, actions):
         rewards = {}
