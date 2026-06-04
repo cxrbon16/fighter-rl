@@ -66,8 +66,8 @@ def train():
         tensorboard_log=tb_log,
     )
 
-    # 30M validation budget for the reward/optimizer fix; raise to 200_000_000 for full runs.
-    model.learn(total_timesteps=30_000_000, callback=[checkpoint_callback, WandbCallback(), metrics_callback])
+    # Experiment 2 budget (A/B reward rebalance); see EXPERIMENTS.md.
+    model.learn(total_timesteps=50_000_000, callback=[checkpoint_callback, WandbCallback(), metrics_callback])
 
     model.save("tasks/dogfight/ppo_dogfight_final")
     run.finish()
