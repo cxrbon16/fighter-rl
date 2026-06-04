@@ -39,6 +39,11 @@ class SelfPlayDogfightEnv(BaseEnv):
             agent: {"ata_rad": 0.0, "aa_rad": 0.0, "dist_ft": 0.0}
             for agent in self.possible_agents
         }
+
+        # Previous action per agent, for the rate-based (jitter) action penalty.
+        self._prev_action = {
+            agent: np.zeros(3, dtype=np.float32) for agent in self.possible_agents
+        }
         self.reward_components = {
             agent: {
                 "survival_reward": 0.0,
@@ -78,6 +83,7 @@ class SelfPlayDogfightEnv(BaseEnv):
             for key in self.reward_components[agent]:
                 self.reward_components[agent][key] = 0.0
             self._step_cache[agent] = {"ata_rad": 0.0, "aa_rad": 0.0, "dist_ft": 0.0}
+            self._prev_action[agent] = np.zeros(3, dtype=np.float32)
 
     def _get_obs(self, agent_id):
         opponent_agent_id = next(uid for uid in self.fdms.keys() if uid != agent_id)
@@ -305,11 +311,15 @@ class SelfPlayDogfightEnv(BaseEnv):
                 step_reward += g_limit_p
             self.reward_components[agent_id]["g_limit_penalty"] = g_limit_p
 
-            # Stability
+            # Stability — penalize control rate (jitter), not sustained deflection, so
+            # holding a hard turn is free while rapid aileron/elevator reversals are taxed.
             agent_actions = actions[agent_id]
-            action_p = -0.03 * (agent_actions[0]**2 + agent_actions[1]**2) * self.reward_weights["action_penalty"]
+            d_ail = agent_actions[0] - self._prev_action[agent_id][0]
+            d_elev = agent_actions[1] - self._prev_action[agent_id][1]
+            action_p = -0.03 * (d_ail**2 + d_elev**2) * self.reward_weights["action_penalty"]
             step_reward += action_p
             self.reward_components[agent_id]["action_penalty"] = action_p
+            self._prev_action[agent_id] = np.array(agent_actions, dtype=np.float32)
 
             # Positioning & Geometry — gated by range: nose-on pays only inside ~5 nm,
             # full weight inside ~1 nm. Removes the long-range point-and-circle exploit.
