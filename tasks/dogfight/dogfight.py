@@ -29,9 +29,15 @@ class SelfPlayDogfightEnv(BaseEnv):
             for agent in self.possible_agents
         }
         self.prev_dist = 0
-        
+
         self.tracking_time = {
             agent: 0 for agent in self.possible_agents
+        }
+
+        # Cache populated by _calculate_rewards_and_dones (runs before _get_obs each step)
+        self._step_cache = {
+            agent: {"ata_rad": 0.0, "aa_rad": 0.0, "dist_ft": 0.0}
+            for agent in self.possible_agents
         }
         self.reward_components = {
             agent: {
@@ -71,6 +77,7 @@ class SelfPlayDogfightEnv(BaseEnv):
         for agent in self.possible_agents:
             for key in self.reward_components[agent]:
                 self.reward_components[agent][key] = 0.0
+            self._step_cache[agent] = {"ata_rad": 0.0, "aa_rad": 0.0, "dist_ft": 0.0}
 
     def _get_obs(self, agent_id):
         opponent_agent_id = next(uid for uid in self.fdms.keys() if uid != agent_id)
@@ -107,65 +114,20 @@ class SelfPlayDogfightEnv(BaseEnv):
         delta_alt = opp_fdm['position/h-sl-ft'] - alt
         norm_delta_alt = delta_alt / 30000.0
 
-        self_x, self_y, self_z = fdm['position/ecef-x-ft'], fdm['position/ecef-y-ft'], fdm['position/ecef-z-ft']
-        opp_x, opp_y, opp_z = opp_fdm['position/ecef-x-ft'], opp_fdm['position/ecef-y-ft'], opp_fdm['position/ecef-z-ft']
-        dist_sq = (opp_x - self_x)**2 + (opp_y - self_y)**2 + (opp_z - self_z)**2
-        distance_ft = np.sqrt(dist_sq)
-        
-        norm_distance = distance_ft / 100000.0 
+        # ATA/AA and distance are computed in _calculate_rewards_and_dones (which runs
+        # before _get_obs each step) and cached to avoid duplicate JSBSim reads.
+        cache = self._step_cache[agent_id]
+        ata_rad = cache["ata_rad"]
+        aa_rad = cache["aa_rad"]
+        distance_ft = cache["dist_ft"]
+
+        norm_distance = distance_ft / 100000.0
+        norm_ata = ata_rad / np.pi
+        norm_aa = aa_rad / np.pi
 
         norm_opp_vc = opp_fdm['velocities/vc-kts'] / 1000.0
         norm_opp_roll = opp_fdm['attitude/phi-rad'] / np.pi
         norm_opp_pitch = opp_fdm['attitude/pitch-rad'] / np.pi
-
-        # Antenna Train Angle and Aspect Angle calculations
-        lat1 = fdm['position/lat-geod-rad']
-        lon1 = fdm['position/long-gc-rad']
-        alt1 = fdm['position/h-sl-ft']
-
-        lat2 = opp_fdm['position/lat-geod-rad']
-        lon2 = opp_fdm['position/long-gc-rad']
-        alt2 = opp_fdm['position/h-sl-ft']
-
-        R_ft = 20925000.0
-
-        dN = (lat2 - lat1) * R_ft
-        dE = (lon2 - lon1) * R_ft * np.cos(lat1)
-        dD = alt1 - alt2
-
-        los_vector = np.array([dN, dE, dD])
-        los_dist = np.linalg.norm(los_vector)
-
-        v1_vector = np.array([
-            fdm['velocities/v-north-fps'],
-            fdm['velocities/v-east-fps'],
-            fdm['velocities/v-down-fps']
-        ])
-        
-        v2_vector = np.array([
-            opp_fdm['velocities/v-north-fps'],
-            opp_fdm['velocities/v-east-fps'],
-            opp_fdm['velocities/v-down-fps']
-        ])
-
-        v1_speed = np.linalg.norm(v1_vector)
-        v2_speed = np.linalg.norm(v2_vector)
-
-        if v1_speed > 0 and los_dist > 0:
-            ata_cos = np.dot(v1_vector, los_vector) / (v1_speed * los_dist)
-            # np.clip hayat kurtarır! Float hassasiyetinden dolayı değer -1.0000001 olursa arccos hata verir (NaN döner).
-            ata_rad = np.arccos(np.clip(ata_cos, -1.0, 1.0))
-        else:
-            ata_rad = 0.0
-
-        if v2_speed > 0 and los_dist > 0:
-            aa_cos = np.dot(v2_vector, los_vector) / (v2_speed * los_dist)
-            aa_rad = np.arccos(np.clip(aa_cos, -1.0, 1.0))
-        else:
-            aa_rad = 0.0
-
-        norm_ata = ata_rad / np.pi
-        norm_aa = aa_rad / np.pi
 
         # Energy Calculations
         G_FT_S2 = 32.174
@@ -238,39 +200,19 @@ class SelfPlayDogfightEnv(BaseEnv):
 
     def _get_info(self, agent_id):
         fdm = self.fdms[agent_id]
-        opponent_id = next(uid for uid in self.fdms.keys() if uid != agent_id)
-        opp_fdm = self.fdms[opponent_id]
-        
-        self_x, self_y, self_z = fdm['position/ecef-x-ft'], fdm['position/ecef-y-ft'], fdm['position/ecef-z-ft']
-        opp_x, opp_y, opp_z = opp_fdm['position/ecef-x-ft'], opp_fdm['position/ecef-y-ft'], opp_fdm['position/ecef-z-ft']
-        dist_ft = np.sqrt((opp_x - self_x)**2 + (opp_y - self_y)**2 + (opp_z - self_z)**2)
-        
         vt_fps = fdm['velocities/vt-fps']
         alt_ft = fdm['position/h-sl-ft']
-        specific_energy = alt_ft + (vt_fps**2) / (2 * 32.174)
-        
-        info = {
-            "dist_ft": dist_ft,
-            "energy": specific_energy,
+
+        info = super()._get_info(agent_id)
+        info.update({
+            "dist_ft": self._step_cache[agent_id]["dist_ft"],
+            "energy": alt_ft + (vt_fps**2) / (2 * 32.174),
             "tracking_time": self.tracking_time[agent_id],
-        }
-        
+        })
+
         if not getattr(self, "is_resetting", False):
             info["reward_components"] = self.reward_components[agent_id]
 
-        if self.render_mode == "debug":
-            info.update({
-                "lat": fdm['position/lat-geod-deg'],
-                "lon": fdm['position/long-gc-deg'],
-                "alt_ft": fdm['position/h-sl-ft'],
-                "alt_m": fdm['position/h-sl-ft'] * 0.3048,
-                "roll_deg": fdm['attitude/phi-deg'],
-                "pitch_deg": fdm['attitude/theta-deg'],
-                "yaw_deg": fdm['attitude/psi-deg'],
-                "airspeed_kts": fdm['velocities/vc-kts'],
-                "airspeed_ms": fdm['velocities/vc-kts'] * 0.514444
-            })
-        
         return info
 
     def _calculate_rewards_and_dones(self, actions):
@@ -345,6 +287,8 @@ class SelfPlayDogfightEnv(BaseEnv):
                 
             norm_ata = ata_rad / np.pi
             norm_aa = aa_rad / np.pi
+
+            self._step_cache[agent_id] = {"ata_rad": ata_rad, "aa_rad": aa_rad, "dist_ft": current_dist}
 
             # Reward Shaping
             step_reward = 0.0
