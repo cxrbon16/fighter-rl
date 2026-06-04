@@ -12,43 +12,72 @@ from wandb.integration.sb3 import WandbCallback
 class DogfightMetricsCallback(BaseCallback):
     def __init__(self, verbose=0):
         super(DogfightMetricsCallback, self).__init__(verbose)
-        self.env_data = {} # Her env_idx için ayrı veri tutacağız
+        self.env_data = {} 
 
     def _on_step(self) -> bool:
         n_envs = len(self.locals['dones'])
         
-        # İlk adımda env_data sözlüğünü başlat
         if not self.env_data:
             for i in range(n_envs):
-                self.env_data[i] = {"dists": [], "energies": [], "tracking": []}
+                self.env_data[i] = {
+                    "dists": [], 
+                    "energies": [], 
+                    "tracking": [],
+                    "rewards": {
+                        "survival_reward": [],
+                        "g_limit_penalty": [],
+                        "action_penalty": [],
+                        "offensive_reward": [],
+                        "delta_energy_reward": [],
+                        "distance_reward": [],
+                        "wez_reward": [],
+                        "crash_penalty": [],
+                        "out_of_bounds_penalty": [],
+                        "victory_reward": [],
+                        "defeat_penalty": []
+                    }
+                }
 
         for i, (info, done) in enumerate(zip(self.locals['infos'], self.locals['dones'])):
-            # Verileri topla ve NaN kontrolü yap
             dist = info.get('dist_ft', 0)
             energy = info.get('energy', 0)
             tracking = info.get('tracking_time', 0)
 
-            # JSBSim NaN dönerse 0 kabul et
             self.env_data[i]["dists"].append(np.nan_to_num(dist))
             self.env_data[i]["energies"].append(np.nan_to_num(energy))
             self.env_data[i]["tracking"].append(np.nan_to_num(tracking))
+            
+            # Reward detaylarını topla
+            comps = info.get('reward_components', {})
+            for key in self.env_data[i]["rewards"].keys():
+                val = comps.get(key, 0.0)
+                self.env_data[i]["rewards"][key].append(np.nan_to_num(val))
 
             if done:
-                # Sadece veri varsa logla (NaN önlemek için)
                 if len(self.env_data[i]["dists"]) > 0:
                     self.logger.record("metrics/avg_distance_ft", np.mean(self.env_data[i]["dists"]))
                     self.logger.record("metrics/avg_energy", np.mean(self.env_data[i]["energies"]))
                     self.logger.record("metrics/avg_tracking_time", np.mean(self.env_data[i]["tracking"]))
                     
+                    # Reward section logları
+                    for key, values in self.env_data[i]["rewards"].items():
+                        if len(values) > 0:
+                            self.logger.record(f"rewards/{key}", np.sum(values))
+                    
                     # Verileri sıfırla
-                    self.env_data[i] = {"dists": [], "energies": [], "tracking": []}
+                    self.env_data[i] = {
+                        "dists": [], 
+                        "energies": [], 
+                        "tracking": [],
+                        "rewards": {k: [] for k in self.env_data[i]["rewards"].keys()}
+                    }
         return True
 
 custom_policy_kwargs = dict(
     activation_fn=torch.nn.Tanh,
     net_arch=dict(
-        pi=[512, 512, 512],
-        vf=[512, 512, 512]
+        pi=[256, 128, 64],
+        vf=[256, 256, 128]
     )
 )
 
@@ -87,16 +116,16 @@ def train():
         env,
         policy_kwargs=custom_policy_kwargs,
         verbose=1,
-        learning_rate=3e-5,
-        n_steps=2048,
-        n_epochs=10,
+        learning_rate=1e-5,
+        n_steps=4096,
+        n_epochs=3,
         ent_coef=0.01,
-        batch_size=8192,
+        batch_size=16384,
         gamma=0.99,
         tensorboard_log="./tasks/dogfight/dogfight_tensorboard/"
     )
 
-    model.learn(total_timesteps=100_000_000, callback=[checkpoint_callback, WandbCallback(), metrics_callback])
+    model.learn(total_timesteps=200_000_000, callback=[checkpoint_callback, WandbCallback(), metrics_callback])
 
     model.save("tasks/dogfight/ppo_dogfight_final")
     run.finish()
