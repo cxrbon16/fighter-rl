@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Design Approval Required
+
+Before starting any refactor, new feature, or structural change — no matter how small — present the proposed design to the user and wait for explicit approval. This includes: merging files, extracting shared modules, changing class hierarchies, modifying reward logic, changing environment interfaces, and reorganizing directory structure.
+
+Describe: what will change, why, and how. Only write code after the user says to proceed.
+
 ## Git Conventions
 
 Commits follow **Conventional Commits**: `type: short description` — lowercase, no period, no capital after the colon.
