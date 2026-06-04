@@ -7,8 +7,7 @@ class ClimbTaskEnv(BaseEnv):
     metadata = {"render_modes": ["human", "none"], "name": "dogfight_climb_v0"}
 
     def __init__(self, render_mode="none"):
-        # Base sınıfı ayağa kaldır
-        super().__init__(render_mode=render_mode)
+        super().__init__(number_of_agents=1, render_mode=render_mode, aircraft="f16")
         
         # Göreve Özel: Sadece 12 Boyutlu Sensör Paketi
         self.observation_spaces = {
@@ -20,14 +19,14 @@ class ClimbTaskEnv(BaseEnv):
         self.prev_vcs = {}
 
     def _get_initial_conditions(self):
-        # Tırmanış görevine özel daraltılmış başlangıç penceresi
-        return {
+        ics = {
             'alt': np.random.uniform(14000.0, 16000.0),
             'vc': np.random.uniform(380.0, 420.0),
             'pitch': np.random.uniform(-2.0, 2.0),
             'roll': np.random.uniform(-5.0, 5.0),
-            'yaw': np.random.uniform(-0.2, 0.2)
+            'yaw': np.random.uniform(-0.2, 0.2),
         }
+        return {agent: ics for agent in self._get_possible_agents()}
 
     def _task_reset(self):
         # Base sınıf reset attıktan sonra hafızayı tazele
