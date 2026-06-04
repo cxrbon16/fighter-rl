@@ -311,9 +311,11 @@ class SelfPlayDogfightEnv(BaseEnv):
             step_reward += action_p
             self.reward_components[agent_id]["action_penalty"] = action_p
 
-            # Positioning & Geometry
+            # Positioning & Geometry — gated by range: nose-on pays only inside ~5 nm,
+            # full weight inside ~1 nm. Removes the long-range point-and-circle exploit.
             offensive_score = (1.0 - norm_ata) + (1.0 - norm_aa)
-            off_reward = (offensive_score - 1.0) * 1.0 * self.reward_weights["offensive_reward"]
+            closeness = np.clip((30000.0 - current_dist) / 24000.0, 0.0, 1.0)
+            off_reward = (offensive_score - 1.0) * closeness * self.reward_weights["offensive_reward"]
             step_reward += off_reward
             self.reward_components[agent_id]["offensive_reward"] = off_reward
 
@@ -324,12 +326,12 @@ class SelfPlayDogfightEnv(BaseEnv):
                 step_reward += en_reward
             self.reward_components[agent_id]["delta_energy_reward"] = en_reward
 
-            # Lethality (WEZ - Weapon Engagement Zone)
-            dist_reward = (distance_delta / 200.0) * 0.2 * self.reward_weights["distance_reward"]
+            # Closing reward — strong, bounded pull toward the merge.
+            dist_reward = np.clip(distance_delta / 80.0, -0.5, 0.5) * self.reward_weights["distance_reward"]
             step_reward += dist_reward
             self.reward_components[agent_id]["distance_reward"] = dist_reward
 
-            in_wez = current_dist < 3000.0 and ata_rad < (10.0 * np.pi / 180.0)
+            in_wez = current_dist < 3000.0 and ata_rad < (15.0 * np.pi / 180.0)
 
             wez_reward = 0.0
             if in_wez:
@@ -354,7 +356,7 @@ class SelfPlayDogfightEnv(BaseEnv):
                 step_reward += out_of_bounds_p
                 terminations[agent_id] = True
 
-            elif self.tracking_time[agent_id] > 20:
+            elif self.tracking_time[agent_id] > 15:
                 vic_reward = 100.0 * self.reward_weights["victory_reward"]
                 step_reward += vic_reward
                 terminations[agent_id] = True
