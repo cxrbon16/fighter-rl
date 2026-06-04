@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Conventions
+
+Commits follow **Conventional Commits**: `type: short description` — lowercase, no period, no capital after the colon.
+
+Types used in this repo: `feat`, `fix`, `refactor`, `style`, `chore`, `test`.
+
+Group logically related changes into one commit. Split unrelated changes into separate commits (e.g. a reward fix and a metrics feature are two commits, not one). Always commit `.gitignore` changes before the files they affect.
+
+`.gitignore` covers: `*.zip`, `*.pkl`, `*.pdf`, `wandb/`, `dogfight_tensorboard/`, `tensorboard/`, `tasks/debug_runs/`, `static/*`, `__pycache__/`, `.venv/`.
+
 ## Experiment Results
 
 When the user asks anything about training metrics, reward curves, learning progress, or experimental results, **immediately load the experiment data** before answering — do not ask the user to run `/exp-results` first:
