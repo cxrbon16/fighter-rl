@@ -2,6 +2,8 @@
 __pycache__/
 dogfight_tensorboard/
 tensorboard/
+tasks/dogfight/tensorboard/
+tasks/curriculum_dogfight/tensorboard/
 *.zip
 *.pdf
 *.pkl

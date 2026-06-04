@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import supersuit as ss
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
@@ -82,12 +83,15 @@ custom_policy_kwargs = dict(
 )
 
 def train():
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    tb_log = f"./tasks/dogfight/tensorboard/{run_id}/"
+
     env = SelfPlayDogfightEnv(render_mode="none")
-    
-    env = ss.black_death_v3(env) 
+
+    env = ss.black_death_v3(env)
     env = ss.frame_stack_v1(env, stack_size=4)
     env = ss.pettingzoo_env_to_vec_env_v1(env)
-    
+
     env = ss.concat_vec_envs_v1(env, num_vec_envs=64, num_cpus=8, base_class='stable_baselines3')
     env = VecMonitor(env)
     env = VecNormalize(env, norm_obs=False, norm_reward=True, clip_reward=10.0)
@@ -104,11 +108,11 @@ def train():
     os.makedirs('./tasks/dogfight/models_checkpoints', exist_ok=True)
 
     checkpoint_callback = CheckpointCallback(
-        save_freq=real_save_freq, 
+        save_freq=real_save_freq,
         save_path='./tasks/dogfight/models_checkpoints',
         name_prefix='ppo_dogfight'
     )
-    
+
     metrics_callback = DogfightMetricsCallback()
 
     model = PPO(
@@ -122,7 +126,7 @@ def train():
         ent_coef=0.01,
         batch_size=16384,
         gamma=0.99,
-        tensorboard_log="./tasks/dogfight/dogfight_tensorboard/"
+        tensorboard_log=tb_log,
     )
 
     model.learn(total_timesteps=200_000_000, callback=[checkpoint_callback, WandbCallback(), metrics_callback])

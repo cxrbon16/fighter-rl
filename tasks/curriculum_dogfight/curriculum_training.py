@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import supersuit as ss
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, BaseCallback
@@ -153,8 +154,11 @@ def make_env(reward_weights):
     return env
 
 def train():
+    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+    tb_base = f"./tasks/curriculum_dogfight/tensorboard/{run_id}"
+
     os.makedirs('./tasks/curriculum_dogfight/models_checkpoints', exist_ok=True)
-    
+
     run = wandb.init(
         project="curriculum-f16-dogfight",
         sync_tensorboard=True,
@@ -166,12 +170,13 @@ def train():
 
     for i, phase in enumerate(PHASES):
         print(f"==================================================")
-        print(f"🚀 STARTING {phase['name']}")
+        print(f"STARTING {phase['name']}  (run: {run_id})")
         print(f"Weights: {phase['reward_weights']}")
         print(f"==================================================")
-        
+
+        tb_log = f"{tb_base}/{phase['name']}/"
         env = make_env(phase["reward_weights"])
-        
+
         # Load previous vec normalize stats if available
         if previous_model_path and os.path.exists(previous_model_path + "_vecnormalize.pkl"):
             print(f"Loading VecNormalize stats from {previous_model_path}_vecnormalize.pkl")
@@ -182,9 +187,8 @@ def train():
             if previous_model_path and os.path.exists(previous_model_path + ".zip"):
                 print(f"Loading existing model from {previous_model_path}.zip")
                 model = PPO.load(previous_model_path, env=env)
-                model.tensorboard_log = f"./tasks/curriculum_dogfight/tensorboard/{phase['name']}/"
+                model.tensorboard_log = tb_log
             else:
-                # First phase, initialize the model
                 model = PPO(
                     "MlpPolicy",
                     env,
@@ -196,35 +200,32 @@ def train():
                     ent_coef=0.1,
                     batch_size=16384,
                     gamma=0.99,
-                    tensorboard_log=f"./tasks/curriculum_dogfight/tensorboard/{phase['name']}/"
+                    tensorboard_log=tb_log,
                 )
         else:
-            # Subsequent phases, update env and reset learning rate / internals if necessary
             model.set_env(env)
-            model.tensorboard_log = f"./tasks/curriculum_dogfight/tensorboard/{phase['name']}/"
+            model.tensorboard_log = tb_log
 
         global_save_freq = 5_000_000
         real_save_freq = max(1, global_save_freq // env.num_envs)
 
         checkpoint_callback = CheckpointCallback(
-            save_freq=real_save_freq, 
+            save_freq=real_save_freq,
             save_path=f'./tasks/curriculum_dogfight/models_checkpoints/{phase["name"]}',
             name_prefix='ppo_dogfight'
         )
         metrics_callback = DogfightMetricsCallback()
 
         model.learn(
-            total_timesteps=phase["timesteps"], 
+            total_timesteps=phase["timesteps"],
             callback=[checkpoint_callback, WandbCallback(), metrics_callback],
-            reset_num_timesteps=True # Keep timesteps continuous across phases
+            reset_num_timesteps=True,
         )
 
-        # Save model and normalization stats at the end of phase
         previous_model_path = f"tasks/curriculum_dogfight/{phase['name']}_final"
         model.save(previous_model_path)
         env.save(previous_model_path + "_vecnormalize.pkl")
-        
-        # Clean up env
+
         env.close()
 
     run.finish()
