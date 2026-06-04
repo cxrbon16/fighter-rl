@@ -57,16 +57,17 @@ def train():
         env,
         policy_kwargs=custom_policy_kwargs,
         verbose=1,
-        learning_rate=1e-5,
+        learning_rate=3e-4,
         n_steps=4096,
-        n_epochs=3,
+        n_epochs=5,
         ent_coef=0.01,
         batch_size=16384,
         gamma=0.99,
         tensorboard_log=tb_log,
     )
 
-    model.learn(total_timesteps=200_000_000, callback=[checkpoint_callback, WandbCallback(), metrics_callback])
+    # 30M validation budget for the reward/optimizer fix; raise to 200_000_000 for full runs.
+    model.learn(total_timesteps=30_000_000, callback=[checkpoint_callback, WandbCallback(), metrics_callback])
 
     model.save("tasks/dogfight/ppo_dogfight_final")
     run.finish()
