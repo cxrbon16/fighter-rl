@@ -42,11 +42,12 @@ def train():
     global_save_freq = 500_000
     real_save_freq = max(1, global_save_freq // env.num_envs)
 
-    os.makedirs('./tasks/dogfight/models_checkpoints', exist_ok=True)
+    checkpoint_dir = f'./tasks/dogfight/models_checkpoints/{run_id}'
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
     checkpoint_callback = CheckpointCallback(
         save_freq=real_save_freq,
-        save_path='./tasks/dogfight/models_checkpoints',
+        save_path=checkpoint_dir,
         name_prefix='ppo_dogfight'
     )
 
@@ -66,7 +67,7 @@ def train():
         tensorboard_log=tb_log,
     )
 
-    # Experiment 2 budget (A/B reward rebalance); see EXPERIMENTS.md.
+    # Experiment 3 budget (restore /24000 offensive closeness); see EXPERIMENTS.md.
     model.learn(total_timesteps=50_000_000, callback=[checkpoint_callback, WandbCallback(), metrics_callback])
 
     model.save("tasks/dogfight/ppo_dogfight_final")
