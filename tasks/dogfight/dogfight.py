@@ -325,7 +325,7 @@ class SelfPlayDogfightEnv(BaseEnv):
             # keeps climbing all the way to WEZ range (full weight at ~3000 ft), so there is
             # a gradient for the final approach and parking just outside guns is not optimal.
             offensive_score = (1.0 - norm_ata) + (1.0 - norm_aa)
-            closeness = np.clip((30000.0 - current_dist) / 27000.0, 0.0, 1.0)
+            closeness = np.clip((30000.0 - current_dist) / 24000.0, 0.0, 1.0)
             off_reward = (offensive_score - 1.0) * closeness * self.reward_weights["offensive_reward"]
             step_reward += off_reward
             self.reward_components[agent_id]["offensive_reward"] = off_reward
