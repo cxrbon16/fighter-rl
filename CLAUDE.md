@@ -20,6 +20,8 @@ Group logically related changes into one commit. Split unrelated changes into se
 
 ## Experiment Results
 
+`EXPERIMENTS.md` is the working log for all self-play training runs (goals, configs, results, verdicts). Read it first when the user asks about experiment history or the current state of training. Every experiment entry must include a **Hypothesis** section stating what the experiment is expected to prove or disprove before the run starts. When writing a new experiment entry, always include this section.
+
 When the user asks anything about training metrics, reward curves, learning progress, or experimental results, **immediately load the experiment data** before answering — do not ask the user to run `/exp-results` first:
 
 ```python
@@ -28,7 +30,7 @@ with open('tasks/exp_results.json') as f:
     all_results = json.load(f)
 ```
 
-If new training runs may have been added since the snapshot, re-parse from source instead (see `.claude/commands/exp-results.md`).
+If new training runs may have been added since the snapshot, re-parse from source instead (see `.claude/commands/exp-results.md`). New self-play runs log to `tasks/dogfight/tensorboard/<run_id>/PPO_1/`; the old `tasks/dogfight/dogfight_tensorboard/` directory is legacy (pre-June 2026 runs).
 
 ## Project Overview
 
@@ -73,7 +75,7 @@ python -m tasks.curriculum_dogfight.test
 
 Monitor training with TensorBoard:
 ```bash
-tensorboard --logdir tasks/dogfight/dogfight_tensorboard
+tensorboard --logdir tasks/dogfight/tensorboard          # self-play experiments (Exp 1+)
 tensorboard --logdir tasks/curriculum_dogfight/tensorboard
 ```
 

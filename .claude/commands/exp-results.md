@@ -28,7 +28,8 @@ def parse_dir(base_dir, label):
 
 all_results = {}
 all_results.update(parse_dir('tasks/curriculum_dogfight/tensorboard', 'curriculum'))
-all_results.update(parse_dir('tasks/dogfight/dogfight_tensorboard', 'dogfight_selfplay'))
+all_results.update(parse_dir('tasks/dogfight/tensorboard', 'dogfight_selfplay'))        # Exp 1+ runs (timestamped subdirs)
+all_results.update(parse_dir('tasks/dogfight/dogfight_tensorboard', 'dogfight_legacy'))  # pre-June 2026 runs
 print(json.dumps({k: list(v.keys()) for k, v in all_results.items()}, indent=2))
 ```
 

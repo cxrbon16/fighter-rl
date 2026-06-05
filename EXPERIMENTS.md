@@ -59,8 +59,8 @@ Milestones: crash -> 0 at 5.77M; first WEZ + victory at 7.34M.
 
 ## Exp 2 — A/B reward rebalance (latest fixes), 50M
 
-- Run: (fill in run_id at launch)
-- Status: PLANNED
+- Run: `20260604_092001`
+- Status: COMPLETE @ 50.3M
 - Date: 2026-06-04
 
 **Goal:** test whether removing the parking / energy-hoard attractor (A/B) lets the
@@ -98,6 +98,60 @@ g_limit weight 1.0, all other weights 1.0.
 - Kills consolidate -> A/B was the main cause; next push harder (tighten WEZ gate 15->10 deg, or scale up).
 - Still destabilizes late -> it is self-play non-stationarity -> Exp 3 = frozen-opponent pool (league).
 
-**Result:** (fill after run)
+**Result (interim @ 10.5M):**
+- GOOD: survival solved faster + stable (crash -> 0 at **3.1M** vs Exp 1's 5.77M, stays 0, no crash regression). Energy hoarding eliminated (A worked: `delta_energy_reward` ~0-11 vs Exp 1's +135). `ep_rew_mean` climbing to ~200, full-length episodes.
+- FLAG: **no kills yet** (wez/victory/tracking all 0) - Exp 1 had its first kill by 7.34M. Not pressing to the merge: `avg_distance_ft` oscillating 16k-48k, never near 3000 ft. Possible over-correction by B (cut medium-range pull without the close-in kill taking over).
+- Watch: if still no kills by ~15-20M, B over-corrected -> restore some medium-range pull or strengthen close-in wez/offensive.
 
-**Verdict:** (fill after run)
+**Result (final @ 50.3M):**
+
+| Phase | Steps | ep_rew | crash | wez | victory | avg_dist |
+|---|---|---|---|---|---|---|
+| Cold start | 0-2.6M | -464 | -100 | 0 | 0 | 52k-101k ft |
+| Survival solved | ~5.8M | -79 | 0 | 0 | 0 | 36k ft |
+| Closing learning | 8-31M | 170-280 | 0 | 0 | 0 | 33k->9k ft |
+| Plateau | 31-50M | 260-370 | 0 | 0 | 0 | 9k-35k ft |
+| Only WEZ touch | 46.66M | — | 0 | 30 | 0 | — |
+
+- A fix confirmed: `delta_energy_reward` capped at 13.5/ep (vs 135 in Exp 1), energy hoarding eliminated.
+- B fix over-corrected: ONE WEZ touch in 50M steps (vs first kill at 7.34M in Exp 1). The `/27000` ramp removed the medium-range gradient entirely; agent settled at 9-30k ft with no incentive to close further.
+- avg_tracking_time peaked at 0.083 (8 steps) — well below the 15-step kill threshold, and only once.
+- Optimizer healthy: approx_kl 0.003-0.005, explained_variance 0.99. std crept 1.01→1.26 (policy getting noisier without converging on a kill strategy).
+
+**Hypothesis verdict: WRONG.** The offensive reward was not strong or well-shaped enough to pull the agent into kill range. Removing the medium-range gradient (B) left no incentive between 6k-30k ft. The offensive reward design needs a rethink for Exp 3.
+
+**Verdict:** B was the bug. A (delta_energy 0.1) is a keeper. Next experiment must restore or replace the medium-range offensive pull while keeping pressure all the way into the WEZ — the B ramp needs to saturate at a closer range (e.g. restore `/24000` from Exp 1, or add a separate WEZ-proximity bonus on top).
+
+---
+
+## Exp 3 — restore offensive closeness to `/24000`, 50M
+
+- Run: `20260605_053643`
+- Status: RUNNING (~7.3M / 50M)
+- Date: 2026-06-05
+
+**Goal:** verify that the parking in Exp 1 was caused by `delta_energy=1.0` (now fixed at 0.1), not by the `/24000` closeness shape. Restore Exp 1's offensive gradient to get kills back, while keeping Exp 2's energy fix to prevent parking.
+
+**Hypothesis:** with `delta_energy=0.1` removing the parking attractor, the `/24000` shape (which produced kills at 7.34M in Exp 1) will again produce kills — and this time they will be stable past 8M because the agent has no incentive to park at 6k ft.
+
+**Config = Exp 2 + one delta:**
+
+| Knob | Exp 2 | Exp 3 |
+|---|---|---|
+| offensive closeness | `/27000` (ramps to WEZ, over-corrected) | **`/24000`** (saturates at ~6k ft, Exp 1 value) |
+
+Unchanged from Exp 2: lr 3e-4, ent_coef 0.01, n_epochs 5, delta_energy weight 0.1, rate-based action penalty, WEZ 15 deg / 15-step hold, g_limit weight 1.0, 60 Hz / 4 substeps, 10 CPUs, budget 50M.
+
+**Watch:**
+- PRIMARY: do kills appear by ~8M? (Exp 1 got first kill at 7.34M)
+- Does win rate HOLD and CLIMB past 8M? (Exp 1 decayed here; Exp 2 never got kills)
+- `delta_energy_reward` stays small (≤13.5/ep) — confirm parking not returning
+- `avg_tracking_time` trending up and not decaying
+- `crash_penalty` stays 0 past 5M
+
+**Decision gate:**
+- Kills appear and consolidate past 8M → reward shaping solved; next = scale up or tighten WEZ gate.
+- Kills appear but decay again past 8M → non-stationarity is the remaining issue → Exp 4 = frozen-opponent pool (league).
+- No kills by 15M → `/24000` alone is not enough; need additional WEZ-proximity signal.
+
+**Result:** (fill after run)
