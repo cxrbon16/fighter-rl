@@ -41,12 +41,12 @@ class DogfightMetricsCallback(BaseCallback):
                 self.env_data[i]["rewards"][key].append(np.nan_to_num(comps.get(key, 0.0)))
 
             if done and len(self.env_data[i]["dists"]) > 0:
-                self.logger.record("metrics/avg_distance_ft", np.mean(self.env_data[i]["dists"]))
-                self.logger.record("metrics/avg_energy", np.mean(self.env_data[i]["energies"]))
-                self.logger.record("metrics/avg_tracking_time", np.mean(self.env_data[i]["tracking"]))
+                self.logger.record_mean("metrics/avg_distance_ft", np.mean(self.env_data[i]["dists"]))
+                self.logger.record_mean("metrics/avg_energy", np.mean(self.env_data[i]["energies"]))
+                self.logger.record_mean("metrics/avg_tracking_time", np.mean(self.env_data[i]["tracking"]))
                 for key, values in self.env_data[i]["rewards"].items():
                     if values:
-                        self.logger.record(f"rewards/{key}", np.sum(values))
+                        self.logger.record_mean(f"rewards/{key}", np.sum(values))
                 self.env_data[i] = {
                     "dists": [],
                     "energies": [],
