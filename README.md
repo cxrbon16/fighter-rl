@@ -1,4 +1,4 @@
-# Optimizing Fighter Jet Policies for Superhuman Emergent Behaviour
+# Self-Play Reinforcement Learning for Superhuman Air Combat Policies
 
 Reinforcement learning project for training F-16 agents to perform air-to-air dogfighting using [JSBSim](https://github.com/JSBSim-Team/jsbsim) for flight dynamics and [Stable-Baselines3](https://github.com/DLR-RM/stable-baselines3) PPO for training.
 
