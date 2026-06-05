@@ -127,7 +127,7 @@ g_limit weight 1.0, all other weights 1.0.
 ## Exp 3 — restore offensive closeness to `/24000`, 50M
 
 - Run: `20260605_053643`
-- Status: RUNNING (~7.3M / 50M)
+- Status: STOPPED @ 13.1M / 50M
 - Date: 2026-06-05
 
 **Goal:** verify that the parking in Exp 1 was caused by `delta_energy=1.0` (now fixed at 0.1), not by the `/24000` closeness shape. Restore Exp 1's offensive gradient to get kills back, while keeping Exp 2's energy fix to prevent parking.
@@ -154,4 +154,25 @@ Unchanged from Exp 2: lr 3e-4, ent_coef 0.01, n_epochs 5, delta_energy weight 0.
 - Kills appear but decay again past 8M → non-stationarity is the remaining issue → Exp 4 = frozen-opponent pool (league).
 - No kills by 15M → `/24000` alone is not enough; need additional WEZ-proximity signal.
 
-**Result:** (fill after run)
+**Result (final @ 13.1M):**
+
+| Phase | Steps | ep_rew | crash | wez | victory* | avg_dist |
+|---|---|---|---|---|---|---|
+| Cold start | 0-4.7M | -339→-31 | -100 | 0 | 0 | noisy |
+| Survival solved | ~4.7M | +10 | 0 | 0 | 0 | — |
+| Closing | 4.7-8.4M | 134→274 | 0 | 0 | 0 | 36k→7.7k ft |
+| First kill | **8.4M** | 274 | 0 | **18** | **100*** | 12.9k ft |
+| Crash regression | 9.4-13.1M | 161→188 | -100 | 0 | 0 | 5k-23k ft |
+
+*victory_reward logged as 0 due to logging bug (fixed in commit 8dc8095); kill confirmed via `defeat_penalty=-100` firing at same step.
+
+- `/24000` proven correct: got a kill at 8.4M vs Exp 2's zero kills in 50M. Hypothesis partially confirmed.
+- Parking eliminated: `delta_energy_reward` stayed ≤12.3/ep throughout.
+- Crash regression severe and **persistent** from 9.4M to end — never self-corrected (unlike Exp 1 which oscillated). ep_len fell from 2600 → 1200 steps as crashes dominated. avg_distance at final checkpoint = 2787 ft (inside WEZ) but with crashes — agent is closing but dying in the attempt.
+- Only ONE WEZ event in 13.1M steps (wez peak = 18, just 9 of 15 steps needed). Kill likely happened but is not repeatable.
+- std crept 1.012→1.081 then fell to 1.063 then rose again to 1.081 — policy oscillating rather than converging.
+- approx_kl stable 0.003-0.005, optimizer healthy throughout.
+
+**Hypothesis verdict: PARTIALLY CORRECT.** `/24000` does produce kills (confirmed). But kills do NOT consolidate — the crash regression is immediate, persistent, and the single kill event was not repeated. The parking fix (delta_energy=0.1) held. The underlying instability is not parking anymore — it is self-play non-stationarity: the shared-policy opponent co-adapts to defend, forcing the attacker into increasingly dangerous maneuvers to close, resulting in crashes.
+
+**Verdict:** Reward shaping is now adequate for the discovery phase. The consolidation failure is a structural self-play problem — a shared, constantly-updating opponent is a moving target that destabilizes co-adaptation. Exp 4 discussion pending.
